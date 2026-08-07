@@ -2,6 +2,7 @@
 
 English | [繁體中文](README.zh-TW.md)
 
+[![GitHub](https://img.shields.io/badge/GitHub-alan66603%2Ftalyx-181717?logo=github)](https://github.com/alan66603/talyx)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP Spec](https://img.shields.io/badge/MCP-2026--07--28-green.svg)](https://modelcontextprotocol.io)
@@ -40,7 +41,7 @@ Runs talyx + a sample MCP server + Prometheus + Alertmanager + Grafana, with
 live traffic, in one command:
 
 ```bash
-git clone https://github.com/alan66603/talyx.git
+git clone https://github.com/alan66603/talyx-mcp.git
 cd talyx
 docker compose -f deploy/compose/demo.yaml up --build
 ```
@@ -78,7 +79,7 @@ over OTLP, set `TALYX_OTLP_ENDPOINT` and install the extra:
 ## Metrics
 
 Aligned to the MCP `2026-07-28` (stateless) spec. Full reference:
-[docs/metrics.md](docs/metrics.md).
+[docs/metrics.md](https://github.com/alan66603/talyx/blob/main/docs/metrics.md).
 
 **Core reliability**
 
@@ -112,7 +113,7 @@ high-risk `InputRequiredResult` gates.
 
 **Security:** Talyx records *no tool arguments* and no message bodies — only
 method/tool names, outcomes, and timings. The one correlation key it needs (the
-sealed `requestState` token) is **hashed in memory and never stored** See [docs/metrics.md](docs/metrics.md).
+sealed `requestState` token) is **hashed in memory and never stored** See [docs/metrics.md](https://github.com/alan66603/talyx/blob/main/docs/metrics.md).
 
 **Overhead:** talyx's own per-chunk processing is sub-millisecond
 (`talyx_proxy_overhead_seconds`), so it doesn't meaningfully slow the server down.
@@ -122,7 +123,7 @@ sealed `requestState` token) is **hashed in memory and never stored** See [docs/
 The proxy forwards bytes in both directions untouched and observes the
 JSON-RPC as a side-channel — if observation ever fails, forwarding is
 unaffected. It's stateless by design, which is the core difference from
-trace-based tools. See [docs/architecture.md](docs/architecture.md)
+trace-based tools. See [docs/architecture.md](https://github.com/alan66603/talyx/blob/main/docs/metrics.md)
 for the positioning table and the "why a proxy, not an SDK" rationale.
 
 ## Roadmap
