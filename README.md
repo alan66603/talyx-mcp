@@ -1,8 +1,9 @@
 # talyx-mcp
 
-English | [繁體中文](README.zh-TW.md)
+English | [繁體中文](https://github.com/alan66603/talyx-mcp/blob/main/README.zh-TW.md)
 
-[![GitHub](https://img.shields.io/badge/GitHub-alan66603%2Ftalyx-181717?logo=github)](https://github.com/alan66603/talyx)
+[![PyPI](https://img.shields.io/pypi/v/talyx-mcp.svg)](https://pypi.org/project/talyx-mcp/)
+[![GitHub](https://img.shields.io/badge/GitHub-alan66603%2Ftalyx--mcp-181717?logo=github)](https://github.com/alan66603/talyx-mcp)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP Spec](https://img.shields.io/badge/MCP-2026--07--28-green.svg)](https://modelcontextprotocol.io)
@@ -28,7 +29,7 @@ flowchart LR
 - [talyx-mcp](#talyx-mcp)
   - [Table of Contents](#table-of-contents)
   - [Quickstart (the demo)](#quickstart-the-demo)
-  - [Use it on your own server](#use-it-on-your-own-server)
+  - [Install](#install)
   - [Metrics](#metrics)
   - [How it works](#how-it-works)
   - [Roadmap](#roadmap)
@@ -52,10 +53,24 @@ login). You'll see request rate, error rate, p95 latency, and the flagship
 **abandoned cycles** (agents silently stuck waiting on a confirmation) — updating
 live. Prometheus is on `:9090`, Alertmanager on `:9093`.
 
-## Use it on your own server
+## Install
 
-Point your MCP client at `talyx` instead of the server, and pass the real
-command after `--`:
+Install from PyPI:
+
+```bash
+pip install talyx-mcp
+```
+
+Or from source:
+
+```bash
+git clone https://github.com/alan66603/talyx-mcp.git
+cd talyx-mcp
+pip install .
+```
+
+Either way, the CLI command is `talyx`. Point your MCP client at it instead of
+the server, and pass the real command after `--`:
 
 ```jsonc
 // before
@@ -65,11 +80,10 @@ command after `--`:
 { "command": "talyx", "args": ["--", "npx", "-y", "@modelcontextprotocol/server-everything"] }
 ```
 
-Metrics are then at `http://localhost:9464/metrics`. Install with
-`pip install .` (or use the image at `deploy/docker/Dockerfile`). Configure the
-port with `TALYX_METRICS_PORT` / `TALYX_METRICS_HOST`. To also push metrics
-over OTLP, set `TALYX_OTLP_ENDPOINT` and install the extra:
-`pip install '.[otlp]'` (Prometheus `/metrics` stays on regardless).
+Metrics are then at `http://localhost:9464/metrics`. Configure the port with
+`TALYX_METRICS_PORT` / `TALYX_METRICS_HOST`. To also push metrics over OTLP, set
+`TALYX_OTLP_ENDPOINT` and install the extra: `pip install 'talyx-mcp[otlp]'`
+(Prometheus `/metrics` stays on regardless).
 
 > The flagship cycle metrics need a server that speaks MCP `2026-07-28`
 > (`InputRequiredResult`). Wrapping an older server still gives you the core
@@ -79,7 +93,7 @@ over OTLP, set `TALYX_OTLP_ENDPOINT` and install the extra:
 ## Metrics
 
 Aligned to the MCP `2026-07-28` (stateless) spec. Full reference:
-[docs/metrics.md](https://github.com/alan66603/talyx/blob/main/docs/metrics.md).
+[docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
 
 **Core reliability**
 
@@ -113,7 +127,7 @@ high-risk `InputRequiredResult` gates.
 
 **Security:** Talyx records *no tool arguments* and no message bodies — only
 method/tool names, outcomes, and timings. The one correlation key it needs (the
-sealed `requestState` token) is **hashed in memory and never stored** See [docs/metrics.md](https://github.com/alan66603/talyx/blob/main/docs/metrics.md).
+sealed `requestState` token) is **hashed in memory and never stored** See [docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
 
 **Overhead:** talyx's own per-chunk processing is sub-millisecond
 (`talyx_proxy_overhead_seconds`), so it doesn't meaningfully slow the server down.
@@ -123,7 +137,7 @@ sealed `requestState` token) is **hashed in memory and never stored** See [docs/
 The proxy forwards bytes in both directions untouched and observes the
 JSON-RPC as a side-channel — if observation ever fails, forwarding is
 unaffected. It's stateless by design, which is the core difference from
-trace-based tools. See [docs/architecture.md](https://github.com/alan66603/talyx/blob/main/docs/metrics.md)
+trace-based tools. See [docs/architecture.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/architecture.md)
 for the positioning table and the "why a proxy, not an SDK" rationale.
 
 ## Roadmap
@@ -136,7 +150,7 @@ Talyx does not claim token metrics.
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/alan66603/talyx-mcp/blob/main/LICENSE).
 
 ## Author
 

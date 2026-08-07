@@ -1,7 +1,9 @@
-# Talyx
+# talyx-mcp
 
-[English](README.md) | 繁體中文
+[English](https://github.com/alan66603/talyx-mcp/blob/main/README.md) | 繁體中文
 
+[![PyPI](https://img.shields.io/pypi/v/talyx-mcp.svg)](https://pypi.org/project/talyx-mcp/)
+[![GitHub](https://img.shields.io/badge/GitHub-alan66603%2Ftalyx--mcp-181717?logo=github)](https://github.com/alan66603/talyx-mcp)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP Spec](https://img.shields.io/badge/MCP-2026--07--28-green.svg)](https://modelcontextprotocol.io)
@@ -24,10 +26,10 @@ flowchart LR
 
 ## 目錄
 
-- [Talyx](#talyx)
+- [talyx-mcp](#talyx-mcp)
   - [目錄](#目錄)
   - [Quick Start](#quick-start)
-  - [如何用在你自己的 server](#如何用在你自己的-server)
+  - [安裝](#安裝)
   - [指標](#指標)
   - [運作方式](#運作方式)
   - [Roadmap](#roadmap)
@@ -40,8 +42,8 @@ flowchart LR
 外加即時流量：
 
 ```bash
-git clone https://github.com/alan66603/talyx.git
-cd talyx
+git clone https://github.com/alan66603/talyx-mcp.git
+cd talyx-mcp
 docker compose -f deploy/compose/demo.yaml up --build
 ```
 
@@ -50,9 +52,22 @@ docker compose -f deploy/compose/demo.yaml up --build
 ——elicitation 循環、每個請求的往返次數，還有 **abandoned cycles**（agent 靜默卡在
 等一個永遠不來的確認）——全部即時更新。Prometheus 在 `:9090`，Alertmanager 在 `:9093`。
 
-## 如何用在你自己的 server
+## 安裝
 
-把你的 MCP client 指向 `talyx`（而不是 server），真正的指令放在 `--` 後面：
+```bash
+pip install talyx-mcp
+```
+
+或
+
+```bash
+git clone https://github.com/alan66603/talyx-mcp.git
+cd talyx-mcp
+pip install .
+```
+
+兩種方式裝出來的 CLI 指令都是 `talyx`。把你的 MCP client 指向它（而不是 server），
+真正的指令放在 `--` 後面：
 
 ```jsonc
 // 改之前
@@ -62,10 +77,9 @@ docker compose -f deploy/compose/demo.yaml up --build
 { "command": "talyx", "args": ["--", "npx", "-y", "@modelcontextprotocol/server-everything"] }
 ```
 
-指標就會在 `http://localhost:9464/metrics`。用 `pip install .` 安裝（或用
-`deploy/docker/Dockerfile` 的映像）。用 `TALYX_METRICS_PORT` / `TALYX_METRICS_HOST`
-設定埠號。若還想把指標推到 OTLP，設 `TALYX_OTLP_ENDPOINT` 並裝上額外相依：
-`pip install '.[otlp]'`（Prometheus `/metrics` 一律照常開著）。
+指標就會在 `http://localhost:9464/metrics`。用 `TALYX_METRICS_PORT` /
+`TALYX_METRICS_HOST` 設定埠號。若還想把指標推到 OTLP，設 `TALYX_OTLP_ENDPOINT`
+並裝上額外相依：`pip install 'talyx-mcp[otlp]'`（Prometheus `/metrics` 一律照常開著）。
 
 > 招牌的循環指標需要一個講 MCP `2026-07-28`（會回 `InputRequiredResult`）的 server。
 > 包在舊 server 上仍能拿到核心可靠性指標；想看循環面板，可以用內附的 mock server：
@@ -73,7 +87,7 @@ docker compose -f deploy/compose/demo.yaml up --build
 
 ## 指標
 
-對齊 MCP `2026-07-28`（stateless）規格。完整參考：[docs/metrics.zh-TW.md](docs/metrics.zh-TW.md)。
+對齊 MCP `2026-07-28`（stateless）規格。完整參考：[docs/metrics.zh-TW.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.zh-TW.md)。
 
 **核心可靠性**
 
@@ -83,7 +97,7 @@ docker compose -f deploy/compose/demo.yaml up --build
 | `talyx_request_duration_seconds` | histogram | `method`、`server` |
 | `talyx_errors_total` | counter | `method`、`server`、`error_code` |
 
-**Multi Round-Trip 循環** MCP `2026-07-28` 版本更新後，server 可以用
+**Multi Round-Trip 循環——招牌指標。** MCP `2026-07-28` 版本更新後，server 可以用
 `InputRequiredResult` 回應 `tools/call`，client 再帶著 server 的 `requestState` 重送；
 這個 elicitation 循環是**一個**邏輯請求，但通用 APM 會把它讀成兩個不相干的請求。
 
@@ -106,7 +120,7 @@ docker compose -f deploy/compose/demo.yaml up --build
 
 **隱私與安全：** Talyx **不記錄任何 tool 參數**、不記錄訊息內容，只取 method/tool
 名稱、結果與時間。它唯一需要的關聯鍵（密封的 `requestState` token）**在記憶體內雜湊、
-絕不落地**。詳見 [docs/metrics.zh-TW.md](docs/metrics.zh-TW.md)。
+絕不落地**。詳見 [docs/metrics.zh-TW.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.zh-TW.md)。
 
 **額外開銷：** talyx 自身每個 chunk 的處理是次毫秒等級（`talyx_proxy_overhead_seconds`），
 所以不會實質拖慢 server。
@@ -114,8 +128,9 @@ docker compose -f deploy/compose/demo.yaml up --build
 ## 運作方式
 
 proxy 在兩個方向都原封轉發位元組，把 JSON-RPC 當旁路（side-channel）觀測——就算觀測
-失敗，轉發也不受影響。它天生 stateless，這是與 trace 類工具的核心
-差異。
+失敗，轉發也不受影響。它天生 stateless，這是與 trace 類工具的核心差異。定位對照表，
+以及「為什麼是 proxy 而不是 SDK」的理由，見
+[docs/architecture.zh-TW.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/architecture.zh-TW.md)。
 
 ## Roadmap
 
@@ -126,7 +141,7 @@ HTTP transport + OAuth、Helm chart，以及可選的 body capture。token 用�
 
 ## License
 
-Apache-2.0。見 [LICENSE](LICENSE)。
+Apache-2.0。見 [LICENSE](https://github.com/alan66603/talyx-mcp/blob/main/LICENSE)。
 
 ## 作者
 
