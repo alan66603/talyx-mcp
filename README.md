@@ -1,4 +1,4 @@
-# Talyx
+# talyx-mcp
 
 English | [繁體中文](README.zh-TW.md)
 
@@ -24,7 +24,7 @@ flowchart LR
 
 ## Table of Contents
 
-- [Talyx](#talyx)
+- [talyx-mcp](#talyx-mcp)
   - [Table of Contents](#table-of-contents)
   - [Quickstart (the demo)](#quickstart-the-demo)
   - [Use it on your own server](#use-it-on-your-own-server)
