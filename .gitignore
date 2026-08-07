@@ -1,0 +1,15 @@
+# Claude Code local settings
+.claude
+/CLAUDE.md
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+
+docs/migration-2026-07-28.md

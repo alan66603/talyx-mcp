@@ -1,0 +1,20 @@
+# Demo image: talyx + the bundled mock server + a traffic driver, so
+# `docker compose up` produces live Multi Round-Trip metrics with no manual
+# client. Not the product image (that's deploy/docker/Dockerfile) — this one
+# bundles a server and generates traffic.
+#
+# The official everything server is deliberately NOT used: it depends on SDK 1.x
+# and never returns InputRequiredResult, so it cannot drive the flagship cycle
+# metrics. The bundled mock server (talyx.mock.server) can.
+FROM python:3.11-slim
+
+WORKDIR /app
+COPY pyproject.toml README.md ./
+COPY src ./src
+RUN python -m venv /venv && /venv/bin/pip install --no-cache-dir .
+ENV PATH="/venv/bin:$PATH"
+
+COPY deploy/compose/driver.py ./driver.py
+
+EXPOSE 9464
+CMD ["python", "driver.py"]

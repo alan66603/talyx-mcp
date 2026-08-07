@@ -1,0 +1,59 @@
+# One-command demo: talyx wrapping the bundled mock server (with a traffic
+# driver that runs every Multi Round-Trip cycle shape), scraped by Prometheus,
+# alerted by Alertmanager, visualised in Grafana. From the repo root:
+#
+#     docker compose -f deploy/compose/demo.yaml up --build
+#
+# Then open Grafana at http://localhost:3000 (anonymous, no login).
+name: talyx-demo
+
+services:
+  mcp-demo:
+    build:
+      context: ../..
+      dockerfile: deploy/compose/Dockerfile.demo
+    environment:
+      TALYX_METRICS_HOST: 0.0.0.0
+      TALYX_METRICS_PORT: "9464"
+    ports:
+      - "9464:9464"
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../../alerts/mcp-rules.yaml:/etc/prometheus/rules/mcp-rules.yaml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - mcp-demo
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../../dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped

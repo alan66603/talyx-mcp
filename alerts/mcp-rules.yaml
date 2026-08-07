@@ -1,0 +1,116 @@
+# Prometheus alerting rules for Talyx. Mounted into the demo's Prometheus,
+# but usable standalone: point your own Prometheus rule_files at this file.
+groups:
+  - name: talyx
+    rules:
+      # The wrapped MCP server subprocess is down (proxy is up, child is not).
+      - alert: MCPServerDown
+        expr: talyx_server_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MCP server subprocess is down"
+          description: >
+            talyx_server_up has been 0 for over 1m on {{ $labels.instance }} —
+            the wrapped MCP server is not running.
+
+      # The exporter itself is unreachable — Prometheus can't scrape /metrics.
+      - alert: MCPExporterDown
+        expr: up{job="talyx"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "talyx exporter unreachable"
+          description: "Prometheus cannot scrape talyx on {{ $labels.instance }}."
+
+      # More than 10% of requests are failing over the last 5 minutes.
+      - alert: MCPHighErrorRate
+        expr: >
+          sum(rate(talyx_errors_total[5m]))
+            / sum(rate(talyx_requests_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High MCP error rate (>10%)"
+          description: >
+            {{ $value | humanizePercentage }} of requests are failing over the
+            last 5m.
+
+      # p95 request latency above 2s over the last 5 minutes.
+      - alert: MCPHighLatencyP95
+        expr: >
+          histogram_quantile(
+            0.95,
+            sum(rate(talyx_request_duration_seconds_bucket[5m])) by (le, method)
+          ) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP request p95 latency high (>2s)"
+          description: "p95 latency for {{ $labels.method }} is {{ $value }}s over 5m."
+
+      # --- Flagship: Multi Round-Trip cycle health (spec §2.3) ---
+
+      # Agents silently stuck: gave InputRequired, never followed up. Neither an
+      # error nor a timeout on the wire — invisible to generic APM, real to users.
+      - alert: MCPAbandonedCyclesSpike
+        expr: sum(rate(talyx_abandoned_cycles_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP elicitation cycles being abandoned"
+          description: >
+            Cycles are being abandoned (InputRequired with no follow-up) at
+            {{ $value | printf "%.3f" }}/s over 5m — an agent is likely stuck
+            waiting on a confirmation that never comes.
+
+      # Runaway cycles: the client's default cap is 10 rounds, and hitting it is
+      # an in-place raise that leaves no wire signal — so we watch the histogram
+      # tail past the le=10 bucket instead.
+      - alert: MCPRunawayCycles
+        expr: >
+          sum(rate(talyx_round_trips_per_request_bucket{le="+Inf"}[5m]))
+            - sum(rate(talyx_round_trips_per_request_bucket{le="10.0"}[5m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP cycles exceeding 10 round-trips"
+          description: "Logical requests are taking more than 10 round-trips over 5m."
+
+      # requestState validation failing — expired / tampered / wrong-audience
+      # tokens. A clean security signal (discriminated on data.reason).
+      - alert: MCPRequestStateRejectedSpike
+        expr: sum(rate(talyx_request_state_rejected_total[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP requestState rejections rising"
+          description: >
+            requestState tokens are being rejected at {{ $value | printf "%.3f" }}/s
+            over 5m (expired / tampered / wrong audience).
+
+      # Server-side cycle time — NOT raw cycle_duration. Subtract the human wait
+      # (input_wait) so a slow user never pages you; only real server slowness
+      # does. This is the average server-side seconds per cycle.
+      - alert: MCPCycleServerSideSlow
+        expr: >
+          (
+            sum(rate(talyx_round_trip_cycle_duration_seconds_sum[5m]))
+              - sum(rate(talyx_input_wait_duration_seconds_sum[5m]))
+          ) / sum(rate(talyx_round_trip_cycle_duration_seconds_count[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "MCP cycle server-side time high (>2s)"
+          description: >
+            Average server-side time per cycle (cycle_duration minus input_wait)
+            is {{ $value | printf "%.2f" }}s over 5m — real server slowness, not
+            slow users.
