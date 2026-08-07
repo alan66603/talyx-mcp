@@ -1,11 +1,12 @@
 [project]
 name = "talyx-mcp"
-version = "0.1.0"
+version = "0.0.1"
 description = "Prometheus exporter and alerting proxy for MCP servers"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
+authors = [{ name = "Tsung-Yao Chen" }]
 dependencies = [
     "prometheus-client>=0.20",
     "opentelemetry-sdk>=1.44",
