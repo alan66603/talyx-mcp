@@ -42,7 +42,7 @@ live traffic, in one command:
 
 ```bash
 git clone https://github.com/alan66603/talyx-mcp.git
-cd talyx
+cd talyx-mcp
 docker compose -f deploy/compose/demo.yaml up --build
 ```
 
