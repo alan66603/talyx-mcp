@@ -9,7 +9,7 @@
 [![MCP Spec](https://img.shields.io/badge/MCP-2026--07--28-green.svg)](https://modelcontextprotocol.io)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 
-**給 MCP server 用的 Prometheus 匯出器與告警工具。** 把它包在任何 stdio MCP server
+**MCP server 的 Prometheus 匯出器與告警工具。** 包在任何 stdio MCP server
 外面，**不必改一行程式碼**，就能在 server 壞掉或變慢的當下馬上知道，且讓你可以確切知道壞掉的地方。
 
 Talyx 是一個 zero-code proxy：它坐在你的 MCP client 與 server 之間，原封不動地轉發
