@@ -59,8 +59,14 @@ class _Lifecycle:
     def up(self) -> None:
         self._metrics.server_up.set(1, {"server": self._metrics.server})
 
-    def down(self) -> None:
-        self._metrics.server_up.set(0, {"server": self._metrics.server})
+    def down(self, crashed: bool) -> None:
+        labels = {"server": self._metrics.server}
+        if not crashed:
+            # Client closed first and the server followed: a clean shutdown, not
+            # an outage, so drop the series instead of reporting 0.
+            self._metrics.server_up.remove(labels)
+            return
+        self._metrics.server_up.set(0, labels)
         # Requests still awaiting a response when the child dies are lost — the
         # server that would have answered them is gone.
         lost = self._tracker.pending_count
