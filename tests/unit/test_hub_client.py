@@ -182,3 +182,37 @@ def test_spawn_failure_prints_one_stderr_line(capsys: pytest.CaptureFixture[str]
         "talyx: could not start hub: no python; metrics will not be reported "
         "(see ~/.talyx/hub.log, or set TALYX_HUB=off)"
     ]
+
+
+def test_spawn_hub_uses_home_cwd_and_allowlisted_env(
+    tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from pathlib import Path
+
+    import talyx.hub.client as client_mod
+
+    monkeypatch.setenv("HOME", str(tmp_path))  # keep ~/.talyx out of the real home
+    monkeypatch.setenv("GITHUB_TOKEN", "ghp_secret")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "aws_secret")
+    monkeypatch.setenv("TALYX_METRICS_PORT", "19464")
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    seen: list[dict] = []
+
+    def fake_popen(args, **kwargs):
+        seen.append({"args": args, **kwargs})
+
+    monkeypatch.setattr(client_mod.subprocess, "Popen", fake_popen)
+    client_mod.spawn_hub()
+
+    assert len(seen) == 1
+    call = seen[0]
+    assert call["cwd"] == Path.home() == tmp_path
+    env = call["env"]
+    assert "GITHUB_TOKEN" not in env
+    assert "AWS_SECRET_ACCESS_KEY" not in env
+    assert env["TALYX_METRICS_PORT"] == "19464"
+    assert env["PATH"] == "/usr/bin:/bin"
+    assert env["HOME"] == str(tmp_path)
+    assert set(env) <= {
+        "PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT",
+    } | {k for k in env if k.startswith("TALYX_")}

@@ -139,11 +139,27 @@ pip install .
 就送出；除非設 `TALYX_HUB=off`（恢復舊的每程序各開 `/metrics`），否則不會退回本機埠。
 hub 的 log 在 `~/.talyx/hub.log`。
 
+hub 的運作：
+
+- **停止 hub**：`pkill -f "talyx hub"`。`talyx unwrap`、`talyx dashboard down` 與
+  `uv tool upgrade` 之後 hub 都會繼續跑；要套用新版程式碼，請重啟它（先停掉，再開一個
+  被包住的 session 或執行 `talyx dashboard up`）。
+- **hub 的設定**（`TALYX_OTLP_ENDPOINT`、`TALYX_METRICS_HOST` / `TALYX_METRICS_PORT`）
+  取自啟動它的那個包裝程序的環境變數。hub 只會從該環境繼承 `TALYX_*` 與少數基本變數
+  （`PATH`、`HOME`、`USER`、語系、`TMPDIR`），不會拿到你 server 的機密，並以你的家目錄
+  為工作目錄執行。
+- **`/metrics` 預設綁定 `0.0.0.0`**，同網路的其他機器連得到。設
+  `TALYX_METRICS_HOST=127.0.0.1` 可只限本機。
+- **重開機後** dashboard 的容器會自己回來，但 hub 要等下一個被包住的 session 或
+  `talyx dashboard up` 才會啟動。
+
 hub 只收事件欄位（方法名、tool 名、耗時、`wait_type`、錯誤碼），不收參數、結果或
 `requestState`。
 
 `talyx_server_up` 會區分正常結束與崩潰：client 先關閉、server 隨後正常結束，該序列會被
-移除、不告警；client 仍連線、server 自己結束，則設為 `0`。邊界情況：若 client 關閉後
+移除、不告警；client 仍連線、server 自己結束，則設為 `0`。以 SIGTERM / SIGINT 停止
+包裝程序（部分 MCP client 會這樣做）視為正常結束。崩潰後的 `0` 序列若 15 分鐘內 server
+沒有再起來就會被移除，不再使用的 server 不會永遠顯示為 down。邊界情況：若 client 關閉後
 server 才自行崩潰，仍會被視為正常結束。
 
 ## 指標

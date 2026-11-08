@@ -154,14 +154,33 @@ queued and sent as soon as the hub is up; nothing falls back to a local port
 unless you set `TALYX_HUB=off`, which restores the old per-process `/metrics`.
 The hub log is `~/.talyx/hub.log`.
 
+Running the hub:
+
+- **Stop it** with `pkill -f "talyx hub"`. It keeps running after
+  `talyx unwrap` and `talyx dashboard down`, and after `uv tool upgrade`; restart
+  it (stop it, then open a wrapped session or run `talyx dashboard up`) to pick
+  up new code.
+- **Its config** (`TALYX_OTLP_ENDPOINT`, `TALYX_METRICS_HOST` /
+  `TALYX_METRICS_PORT`) comes from the environment of whichever wrapper starts
+  it. The hub gets only `TALYX_*` and a few basics (`PATH`, `HOME`, `USER`,
+  locale, `TMPDIR`) from that environment, not your servers' secrets, and runs
+  from your home directory.
+- **`/metrics` binds `0.0.0.0` by default**, so it is reachable from your
+  network. Set `TALYX_METRICS_HOST=127.0.0.1` to keep it local.
+- **After a reboot** the dashboard containers come back on their own, but the
+  hub starts only with the next wrapped session or `talyx dashboard up`.
+
 The hub receives only event fields (method name, tool name, durations,
 `wait_type`, error codes), never parameters, results, or `requestState`.
 
 `talyx_server_up` distinguishes a clean exit from a crash: if the client closes
 first and the server then exits normally, the series is removed and nothing
 alerts; if the client is still connected and the server exits by itself, it goes
-to `0`. Edge case: if the client closes and the server later crashes on its own,
-it is still reported as clean.
+to `0`. Stopping the wrapper with SIGTERM / SIGINT (as some MCP clients do)
+counts as clean. A crashed server's `0` series is removed after 15 minutes if it
+does not come back, so a server you stopped using does not stay down forever.
+Edge case: if the client closes and the server later crashes on its own, it is
+still reported as clean.
 
 ## Metrics
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import queue
 import select
 import socket
@@ -120,13 +121,30 @@ def _peer_closed(sock: socket.socket) -> bool:
         return True
 
 
+# The only variables the long-lived hub inherits from the wrapper that starts it
+# (plus every TALYX_*), so a wrapped server's secrets never reach the hub.
+_HUB_ENV_ALLOWLIST = ("PATH", "HOME", "USER", "LANG", "LC_ALL", "TMPDIR", "SYSTEMROOT")
+
+
+def _hub_env() -> dict[str, str]:
+    return {
+        k: v
+        for k, v in os.environ.items()
+        if k in _HUB_ENV_ALLOWLIST or k.startswith("TALYX_")
+    }
+
+
 def spawn_hub() -> None:
     """Start a detached `python -m talyx hub`, logging to ~/.talyx/hub.log."""
-    log_dir = Path.home() / ".talyx"
+    home = Path.home()
+    log_dir = home / ".talyx"
     log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     with open(log_dir / "hub.log", "ab") as log:
         subprocess.Popen(
             [sys.executable, "-m", "talyx", "hub"],
+            # Outlives the wrapper: don't pin its cwd or inherit its environment.
+            cwd=home,
+            env=_hub_env(),
             start_new_session=True,
             stdin=subprocess.DEVNULL,
             stdout=log,
