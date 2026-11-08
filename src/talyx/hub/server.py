@@ -13,15 +13,20 @@ from talyx.metrics.registry import Metrics, apply_event
 _INGEST_HOST = "127.0.0.1"
 # Generous per-line cap; an overlong line drops that one connection only.
 _LINE_LIMIT = 1024 * 1024
+# How long a crashed server's `server_up 0` series stays before it is removed.
+CRASH_TTL_SECONDS = 900
 
 
 class Hub:
     """Aggregates wrapper events (newline-JSON over local TCP) into one Metrics."""
 
-    def __init__(self, metrics: Metrics) -> None:
+    def __init__(self, metrics: Metrics, crash_ttl: float = CRASH_TTL_SECONDS) -> None:
         self.metrics = metrics
         # server -> number of live children (across all connections)
         self._live: Counter[str] = Counter()
+        self._crash_ttl = crash_ttl
+        # server -> pending removal of its crashed `server_up 0` series
+        self._expiry: dict[str, asyncio.TimerHandle] = {}
 
     async def serve(self, host: str, port: int) -> asyncio.Server:
         return await asyncio.start_server(self._handle, host, port, limit=_LINE_LIMIT)
@@ -60,6 +65,7 @@ class Hub:
         if isinstance(item, ChildUp):
             mine[server] += 1
             self._live[server] += 1
+            self._cancel_expiry(server)
             self.metrics.server_up.set(1, {"server": server})
         elif isinstance(item, ChildDown):
             if mine[server] <= 0:
@@ -79,10 +85,24 @@ class Hub:
             self.metrics.inflight_lost.add(lost, {"server": server})
         if self._live[server] <= 0:
             del self._live[server]
+            self._cancel_expiry(server)
             if crashed:
                 self.metrics.server_up.set(0, {"server": server})
+                loop = asyncio.get_running_loop()
+                self._expiry[server] = loop.call_later(self._crash_ttl, self._expire, server)
             else:
                 self.metrics.server_up.remove({"server": server})
+
+    def _cancel_expiry(self, server: str) -> None:
+        handle = self._expiry.pop(server, None)
+        if handle is not None:
+            handle.cancel()
+
+    def _expire(self, server: str) -> None:
+        self._expiry.pop(server, None)
+        if self._live[server] <= 0:
+            self._live.pop(server, None)
+            self.metrics.server_up.remove({"server": server})
 
 
 async def _run(config: Config) -> int:

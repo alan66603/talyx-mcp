@@ -103,6 +103,43 @@ async def test_wrong_value_type_line_does_not_kill_connection(
     assert 'server="mem",status="ok"} 1.0' in scrape(hub.metrics)
 
 
+@pytest.fixture
+async def short_ttl_hub() -> AsyncIterator[Running]:
+    metrics = Metrics()
+    server = await Hub(metrics, crash_ttl=0.15).serve("127.0.0.1", 0)
+    running = Running(metrics, server)
+    yield running
+    for w in running.writers:
+        w.close()
+    server.close()
+    await server.wait_closed()
+
+
+def test_crash_ttl_defaults_to_module_constant() -> None:
+    import talyx.hub.server as hub_server
+
+    assert hub_server.CRASH_TTL_SECONDS == 900
+    assert Hub(Metrics())._crash_ttl == hub_server.CRASH_TTL_SECONDS
+
+
+async def test_crashed_zero_expires_after_ttl(short_ttl_hub: Running, scrape: Scrape) -> None:
+    w = await short_ttl_hub.connect()
+    await send(w, encode("mem", ChildUp()))
+    await send(w, encode("mem", ChildDown(True, 0)))
+    assert 'talyx_server_up{server="mem"} 0.0' in scrape(short_ttl_hub.metrics)
+    await asyncio.sleep(0.3)
+    assert 'talyx_server_up{server="mem"}' not in scrape(short_ttl_hub.metrics)
+
+
+async def test_childup_before_ttl_cancels_expiry(short_ttl_hub: Running, scrape: Scrape) -> None:
+    w = await short_ttl_hub.connect()
+    await send(w, encode("mem", ChildUp()))
+    await send(w, encode("mem", ChildDown(True, 0)))
+    await send(w, encode("mem", ChildUp()))
+    await asyncio.sleep(0.3)
+    assert 'talyx_server_up{server="mem"} 1.0' in scrape(short_ttl_hub.metrics)
+
+
 def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
