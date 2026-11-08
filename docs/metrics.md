@@ -3,7 +3,7 @@
 English | [繁體中文](metrics.zh-TW.md)
 
 Talyx exposes Prometheus metrics on `/metrics` (default port `9464`). It
-records **no tool arguments** and no message bodies — only method/tool names,
+**does not record tool argument contents** or message bodies — only method/tool names,
 outcomes, timings, and cycle structure. The one correlation key it needs (the
 sealed `requestState` token) is **hashed in memory and never stored** in any
 label, log, or trace.

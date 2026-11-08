@@ -18,9 +18,10 @@ traffic. It ships with a Grafana dashboard and Alertmanager rules. It is
 
 ```mermaid
 flowchart LR
-    client["MCP client"] <-->|stdio JSON-RPC| talyx["talyx<br/>(proxy + exporter)"]
+    client["MCP client"] <-->|stdio JSON-RPC| talyx["talyx wrapper<br/>(one per server)"]
     talyx <-->|stdio JSON-RPC| server["your MCP server"]
-    talyx -->|/metrics :9464| prom["Prometheus"] --> grafana["Grafana"]
+    talyx -->|events, local TCP :9465| hub["talyx hub"]
+    hub -->|/metrics :9464| prom["Prometheus"] --> grafana["Grafana"]
     prom --> am["Alertmanager"]
 ```
 
@@ -72,10 +73,14 @@ Open **http://localhost:3000** (Grafana) or **http://localhost:9090**
 
 ### Servers talyx cannot wrap
 
-`talyx wrap` skips these and says why:
+These are not in `~/.claude.json`, so `talyx wrap` never sees them and does not
+list them:
 
 - **Plugin-provided servers** (managed by the plugin, not by your config).
 - **claude.ai connectors.**
+
+These are in your config, and `talyx wrap` skips them and says why:
+
 - **Project scope** (`.mcp.json`): wrapping would commit your personal absolute
   paths into a shared file.
 - **URL (http) servers with headers**: talyx will not move credentials into
@@ -220,7 +225,7 @@ high-risk `InputRequiredResult` gates.
 **Security:** Talyx does not record tool argument contents or message bodies; it
 only reads method and tool names, outcomes, and timings. The hub receives only
 those event fields, never parameters, results, or `requestState`. The one correlation key it needs (the
-sealed `requestState` token) is **hashed in memory and never stored** See [docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
+sealed `requestState` token) is **hashed in memory and never stored**. See [docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
 
 **Overhead:** talyx's own per-chunk processing is sub-millisecond
 (`talyx_proxy_overhead_seconds`), so it doesn't meaningfully slow the server down.

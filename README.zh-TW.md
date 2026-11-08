@@ -18,9 +18,10 @@ Alertmanager 規則。它是 **stateless** 的——沒有資料庫，Prometheus
 
 ```mermaid
 flowchart LR
-    client["MCP client"] <-->|stdio JSON-RPC| talyx["talyx<br/>(proxy + exporter)"]
+    client["MCP client"] <-->|stdio JSON-RPC| talyx["talyx 包裝程序<br/>（每個 server 一個）"]
     talyx <-->|stdio JSON-RPC| server["your MCP server"]
-    talyx -->|/metrics :9464| prom["Prometheus"] --> grafana["Grafana"]
+    talyx -->|事件，本機 TCP :9465| hub["talyx hub"]
+    hub -->|/metrics :9464| prom["Prometheus"] --> grafana["Grafana"]
     prom --> am["Alertmanager"]
 ```
 
@@ -68,10 +69,13 @@ talyx dashboard up          # Prometheus + Alertmanager + Grafana，一行啟動
 
 ### talyx 包不了的 server
 
-`talyx wrap` 會跳過下列項目並說明原因：
+下列項目不在 `~/.claude.json` 裡，`talyx wrap` 看不到它們，也不會列出：
 
 - **Plugin 帶的 server**（由 plugin 管理，不在你的設定裡）。
 - **claude.ai connector。**
+
+下列項目在你的設定裡，`talyx wrap` 會跳過並說明原因：
+
 - **Project scope**（`.mcp.json`）：包下去會把你個人的絕對路徑提交進共用檔案。
 - **帶 headers 的 URL（http）server**：talyx 不會把憑證搬進命令列參數。
 - **sse server。**

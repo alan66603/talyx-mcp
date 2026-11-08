@@ -2,7 +2,7 @@
 
 [English](metrics.md) | 繁體中文
 
-Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記錄任何 tool 參數**、
+Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記錄 tool 參數內容**、
 不記錄訊息內容——只取 method/tool 名稱、結果、時間與循環結構。它唯一需要的關聯鍵
 （密封的 `requestState` token）**在記憶體內雜湊，絕不寫入任何 label、log 或 trace**。
 
