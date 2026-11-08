@@ -7,12 +7,17 @@ from collections.abc import Callable
 from time import perf_counter
 
 from talyx.config import Config
+from talyx.hub.client import HubClient, spawn_hub
+from talyx.hub.server import run_hub
+from talyx.hub.wire import ChildDown, ChildUp, ProxyOverhead
 from talyx.metrics.registry import Metrics, apply_event
 from talyx.metrics.server import start_metrics_server
 from talyx.proxy.jsonrpc import Event, TrafficObserver
 from talyx.proxy.stdio import StdioProxy
 
 USAGE = "usage: talyx -- <server command> [args...]"
+
+_HUB_HOST = "127.0.0.1"
 
 
 def parse_command(argv: list[str]) -> list[str]:
@@ -74,21 +79,68 @@ class _Lifecycle:
             self._metrics.inflight_lost.add(lost, {"server": self._metrics.server})
 
 
+class _HubRecorder:
+    """Hub mode: ships observed events (and per-chunk overhead) to the hub."""
+
+    def __init__(self, tracker: TrafficObserver, client: HubClient, server: str) -> None:
+        self._tracker = tracker
+        self._client = client
+        self._server = server
+
+    def on_client_bytes(self, chunk: bytes) -> None:
+        self._record(self._tracker.feed_client, chunk)
+
+    def on_server_bytes(self, chunk: bytes) -> None:
+        self._record(self._tracker.feed_server, chunk)
+
+    def _record(self, feed: Callable[[bytes], list[Event]], chunk: bytes) -> None:
+        start = perf_counter()
+        for event in feed(chunk):
+            self._client.send(self._server, event)
+        self._client.send(self._server, ProxyOverhead(perf_counter() - start))
+
+
+class _HubLifecycle:
+    """Hub mode: child up/down; the hub decides what that means for server_up."""
+
+    def __init__(self, tracker: TrafficObserver, client: HubClient, server: str) -> None:
+        self._tracker = tracker
+        self._client = client
+        self._server = server
+
+    def up(self) -> None:
+        self._client.send(self._server, ChildUp())
+
+    def down(self, crashed: bool) -> None:
+        lost = self._tracker.pending_count if crashed else 0
+        self._client.send(self._server, ChildDown(crashed=crashed, inflight_lost=lost))
+
+
 def main(argv: list[str] | None = None) -> int:
-    command = parse_command(sys.argv[1:] if argv is None else list(argv))
+    args = sys.argv[1:] if argv is None else list(argv)
+    if args[:1] == ["hub"]:
+        return run_hub(Config.from_env())
+    command = parse_command(args)
     if not command:
         print(USAGE, file=sys.stderr)
         return 2
 
     config = Config.from_env()
-    metrics = Metrics(
-        server=server_name(config, command), otlp_endpoint=config.otlp_endpoint
-    )
-    start_metrics_server(metrics, config.metrics_host, config.metrics_port)
-
+    server = server_name(config, command)
     tracker = TrafficObserver(abandon_timeout_seconds=config.abandoned_timeout_seconds)
-    recorder = _Recorder(tracker, metrics)
-    lifecycle = _Lifecycle(tracker, metrics)
+    client: HubClient | None = None
+    recorder: _Recorder | _HubRecorder
+    lifecycle: _Lifecycle | _HubLifecycle
+    if config.hub_enabled:
+        client = HubClient(_HUB_HOST, config.hub_port, spawn=spawn_hub)
+        recorder = _HubRecorder(tracker, client, server)
+        lifecycle = _HubLifecycle(tracker, client, server)
+    else:
+        metrics = Metrics(server=server, otlp_endpoint=config.otlp_endpoint)
+        start_metrics_server(metrics, config.metrics_host, config.metrics_port)
+        recorder = _Recorder(tracker, metrics)
+        lifecycle = _Lifecycle(tracker, metrics)
+
     proxy = StdioProxy(
         command,
         on_client_bytes=recorder.on_client_bytes,
@@ -96,7 +148,12 @@ def main(argv: list[str] | None = None) -> int:
         on_child_up=lifecycle.up,
         on_child_down=lifecycle.down,
     )
-    return asyncio.run(proxy.run())
+    try:
+        return asyncio.run(proxy.run())
+    finally:
+        # on_child_down has queued the final ChildDown by now; flush it (bounded).
+        if client is not None:
+            client.close()
 
 
 if __name__ == "__main__":
