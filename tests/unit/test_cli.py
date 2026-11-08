@@ -4,9 +4,11 @@ import json
 
 import pytest
 
-from talyx.cli import _Lifecycle, main, parse_command
+from talyx import cli
+from talyx.cli import _Lifecycle, main, parse_command, resolve_talyx_cmd
 from talyx.metrics.registry import Metrics
 from talyx.proxy.jsonrpc import TrafficObserver
+from talyx.wrap.apply import Report
 
 
 def test_parse_strips_leading_separator() -> None:
@@ -170,3 +172,121 @@ def test_hub_off_keeps_local_endpoint(monkeypatch) -> None:
     assert cli.main(["--", "srv"]) == 0
     assert len(started) == 1
     assert _FakeClient.instances == []
+
+
+@pytest.fixture
+def sandbox(tmp_path, monkeypatch):
+    """Point every real-path helper at tmp_path so no test touches ~ or `claude`."""
+    monkeypatch.setattr(cli, "_claude_json_path", lambda: tmp_path / "claude.json")
+    monkeypatch.setattr(cli, "_backup_path", lambda: tmp_path / "backup.json")
+    monkeypatch.setattr(cli, "_cwd", lambda: tmp_path)
+    monkeypatch.setattr(cli, "read_entries", lambda claude_json, cwd: [])
+    monkeypatch.setattr(cli.shutil, "which", lambda name: "/opt/bin/talyx")
+    return tmp_path
+
+
+def test_separator_forces_proxy_mode(monkeypatch) -> None:
+    called = {}
+    monkeypatch.setattr(cli, "_run_proxy", lambda cmd: called.setdefault("cmd", cmd) and 0)
+    cli.main(["--", "wrap", "x"])
+    assert called["cmd"] == ["wrap", "x"]
+
+
+def test_wrap_subcommand_dispatches(sandbox, monkeypatch) -> None:
+    seen = {}
+
+    def fake_wrap_all(entries, talyx_cmd, cli_, backup, cwd, dry_run=False):
+        seen.update(talyx_cmd=talyx_cmd, dry_run=dry_run, backup=backup, cwd=cwd)
+        return Report(wrapped=["a"], skipped=[("b", "remote")], failed=[])
+
+    monkeypatch.setattr(cli, "wrap_all", fake_wrap_all)
+    assert main(["wrap", "--dry-run"]) == 0
+    assert seen["dry_run"] is True
+    assert seen["talyx_cmd"] == "/opt/bin/talyx"
+    assert seen["cwd"] == sandbox
+
+
+def test_wrap_failure_exits_1(sandbox, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "wrap_all", lambda *a, **k: Report(failed=[("x", "boom")]))
+    assert main(["wrap"]) == 1
+    assert "boom" in capsys.readouterr().err
+
+
+def test_wrap_notes_project_scope(sandbox, monkeypatch, capsys) -> None:
+    (sandbox / ".mcp.json").write_text("{}")
+    monkeypatch.setattr(cli, "wrap_all", lambda *a, **k: Report())
+    assert main(["wrap"]) == 0
+    assert ".mcp.json" in capsys.readouterr().err
+
+
+def test_unwrap_prints_restored(sandbox, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli, "unwrap_all", lambda *a, **k: Report(wrapped=["mem"]))
+    assert main(["unwrap"]) == 0
+    err = capsys.readouterr().err
+    assert "restored" in err and "mem" in err
+
+
+def test_backup_error_is_one_line(sandbox, monkeypatch, capsys) -> None:
+    def boom(*a, **k):
+        raise cli.BackupError("backup is corrupt")
+
+    monkeypatch.setattr(cli, "unwrap_all", boom)
+    assert main(["unwrap"]) == 1
+    err = capsys.readouterr().err
+    assert err.strip() == "talyx: backup is corrupt"
+
+
+def test_invalid_claude_json_is_one_line(sandbox, monkeypatch, capsys) -> None:
+    def bad(claude_json, cwd):
+        raise json.JSONDecodeError("bad", "x", 0)
+
+    monkeypatch.setattr(cli, "read_entries", bad)
+    assert main(["wrap"]) == 1
+    err = capsys.readouterr().err
+    assert err.startswith("talyx: ") and "Traceback" not in err
+
+
+def test_hub_subcommand_runs_hub(monkeypatch) -> None:
+    monkeypatch.setattr(cli, "run_hub", lambda config: 7)
+    assert main(["hub"]) == 7
+
+
+def test_dashboard_placeholder(capsys) -> None:
+    assert main(["dashboard"]) == 2
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "dashboard not available yet" in captured.err
+
+
+def test_venv_talyx_warns(tmp_path, monkeypatch) -> None:
+    (tmp_path / ".venv" / "bin").mkdir(parents=True)
+    (tmp_path / ".venv" / "pyvenv.cfg").write_text("")
+    exe = tmp_path / ".venv" / "bin" / "talyx"
+    exe.write_text("")
+    monkeypatch.setattr(cli.shutil, "which", lambda name: str(exe))
+    path, warning = resolve_talyx_cmd()
+    assert path is not None and warning is not None and "virtualenv" in warning
+
+
+def test_talyx_missing_errors(sandbox, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    assert main(["wrap"]) == 1
+    assert "uv tool install" in capsys.readouterr().err
+
+
+def test_subcommand_output_never_on_stdout(sandbox, monkeypatch, capsys) -> None:
+    monkeypatch.setattr(
+        cli, "wrap_all", lambda *a, **k: Report(wrapped=["a"], skipped=[("b", "r")])
+    )
+    monkeypatch.setattr(cli, "unwrap_all", lambda *a, **k: Report(wrapped=["a"]))
+    main(["wrap"])
+    main(["unwrap"])
+    main(["dashboard"])
+    assert capsys.readouterr().out == ""
+
+
+def test_help_lists_subcommands(capsys) -> None:
+    assert main(["--help"]) == 0
+    out = capsys.readouterr().out
+    for name in ("wrap", "unwrap", "hub", "dashboard"):
+        assert name in out

@@ -118,8 +118,7 @@ def wrap_all(
 ) -> Report:
     report = Report()
     cwd_s = str(cwd)
-    if not dry_run:
-        _load(backup)  # fail fast on an untrusted backup, before any CLI call
+    _load(backup)  # read-only; fail fast on an untrusted backup, even for a dry run
     for entry in entries:
         plan = plan_wrap(entry, talyx_cmd)
         if isinstance(plan, Skip):

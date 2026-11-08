@@ -97,6 +97,13 @@ def test_dry_run_touches_nothing(tmp_path: Path) -> None:
     assert r.wrapped == ["mem"]
 
 
+def test_dry_run_rejects_corrupt_backup(tmp_path: Path) -> None:
+    backup = tmp_path / "b.json"
+    backup.write_text("not json")
+    with pytest.raises(BackupError):
+        wrap_all([stdio_entry("mem")], "/bin/talyx", FakeCli(), backup, tmp_path, dry_run=True)  # type: ignore[arg-type]
+
+
 def test_backup_is_private(tmp_path: Path) -> None:
     backup = tmp_path / "sub" / "b.json"
     wrap_all([stdio_entry("mem")], "/bin/talyx", FakeCli(), backup, tmp_path)  # type: ignore[arg-type]

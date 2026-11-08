@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import argparse
 import asyncio
+import json
 import os
+import shutil
 import sys
 from collections.abc import Callable
+from pathlib import Path
 from time import perf_counter
 
 from talyx.config import Config
@@ -14,6 +18,10 @@ from talyx.metrics.registry import Metrics, apply_event
 from talyx.metrics.server import start_metrics_server
 from talyx.proxy.jsonrpc import Event, TrafficObserver
 from talyx.proxy.stdio import StdioProxy
+from talyx.wrap.apply import BackupError, ClaudeCli, Report, unwrap_all, wrap_all
+from talyx.wrap.plan import read_entries
+
+SUBCOMMANDS = ("wrap", "unwrap", "hub", "dashboard")
 
 USAGE = "usage: talyx -- <server command> [args...]"
 
@@ -116,11 +124,118 @@ class _HubLifecycle:
         self._client.send(self._server, ChildDown(crashed=crashed, inflight_lost=lost))
 
 
+def resolve_talyx_cmd() -> tuple[str | None, str | None]:
+    """Absolute path of the `talyx` on PATH, plus an optional warning."""
+    found = shutil.which("talyx")
+    if found is None:
+        return None, "talyx is not on PATH; install it with: uv tool install talyx-mcp"
+    path = Path(found).absolute()
+    for parent in path.parents:
+        if (parent / "pyvenv.cfg").is_file():
+            return str(path), (
+                f"talyx resolves inside a virtualenv ({path}); wrapped servers break if it "
+                "moves. Prefer: uv tool install talyx-mcp"
+            )
+    return str(path), None
+
+
+def _claude_json_path() -> Path:
+    return Path.home() / ".claude.json"
+
+
+def _backup_path() -> Path:
+    return Path.home() / ".talyx" / "wrap-backup.json"
+
+
+def _cwd() -> Path:
+    return Path.cwd()
+
+
+def _err(message: str) -> None:
+    print(message, file=sys.stderr)
+
+
+def _print_report(report: Report, done: str) -> None:
+    for name in report.wrapped:
+        _err(f"  {done}: {name}")
+    for name, reason in report.skipped:
+        _err(f"  skipped: {name} ({reason})")
+    for name, reason in report.failed:
+        _err(f"  failed: {name} ({reason})")
+
+
+def _cmd_wrap(dry_run: bool) -> int:
+    talyx_cmd, warning = resolve_talyx_cmd()
+    if talyx_cmd is None:
+        _err(f"talyx: {warning}")
+        return 1
+    if warning:
+        _err(f"talyx: warning: {warning}")
+    cwd = _cwd()
+    entries = read_entries(_claude_json_path(), cwd)
+    report = wrap_all(entries, talyx_cmd, ClaudeCli(), _backup_path(), cwd, dry_run=dry_run)
+    _print_report(report, "would wrap" if dry_run else "wrapped")
+    if (cwd / ".mcp.json").exists():
+        _err("talyx: project scope (.mcp.json) is not handled")
+    if dry_run:
+        _err("talyx: dry run, nothing changed")
+    else:
+        _err("talyx: restart your Claude Code session for changes to take effect")
+    return 1 if report.failed else 0
+
+
+def _cmd_unwrap() -> int:
+    report = unwrap_all(_claude_json_path(), ClaudeCli(), _backup_path(), _cwd())
+    _print_report(report, "restored")
+    _err("talyx: restart your Claude Code session for changes to take effect")
+    return 1 if report.failed else 0
+
+
+def _build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="talyx",
+        description="MCP observability proxy. Proxy a server with: talyx -- <server command>",
+    )
+    sub = parser.add_subparsers(dest="subcommand", metavar="{wrap,unwrap,hub,dashboard}")
+    wrap = sub.add_parser("wrap", help="route Claude Code's MCP servers through talyx")
+    wrap.add_argument("--dry-run", action="store_true", help="show the plan, change nothing")
+    sub.add_parser("unwrap", help="restore the MCP servers that `talyx wrap` rewrote")
+    sub.add_parser("hub", help="run the shared metrics hub")
+    sub.add_parser("dashboard", help="start/stop the bundled dashboard (not available yet)")
+    return parser
+
+
+def _run_subcommand(args: list[str]) -> int:
+    try:
+        ns = _build_parser().parse_args(args)
+    except SystemExit as e:  # --help (0) or a usage error (2)
+        return e.code if isinstance(e.code, int) else 1
+    try:
+        if ns.subcommand == "wrap":
+            return _cmd_wrap(ns.dry_run)
+        if ns.subcommand == "unwrap":
+            return _cmd_unwrap()
+        if ns.subcommand == "hub":
+            return run_hub(Config.from_env())
+        _err("talyx: dashboard not available yet")
+        return 2
+    except (BackupError, json.JSONDecodeError, OSError) as e:
+        _err(f"talyx: {e}")
+        return 1
+
+
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else list(argv)
-    if args[:1] == ["hub"]:
-        return run_hub(Config.from_env())
+    if args and (args[0] in SUBCOMMANDS or args[0] in ("-h", "--help")):
+        return _run_subcommand(args)
     command = parse_command(args)
+    if not command:
+        print(USAGE, file=sys.stderr)
+        return 2
+    return _run_proxy(command)
+
+
+def _run_proxy(command: list[str]) -> int:
     if not command:
         print(USAGE, file=sys.stderr)
         return 2
@@ -154,6 +269,7 @@ def main(argv: list[str] | None = None) -> int:
         # on_child_down has queued the final ChildDown by now; flush it (bounded).
         if client is not None:
             client.close()
+
 
 
 if __name__ == "__main__":
