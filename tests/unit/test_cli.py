@@ -276,7 +276,7 @@ def test_venv_talyx_warns(tmp_path, monkeypatch) -> None:
 
 
 def test_talyx_missing_errors(sandbox, monkeypatch, capsys) -> None:
-    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None if name == "talyx" else "/x")
     assert main(["wrap"]) == 1
     assert "uv tool install" in capsys.readouterr().err
 
@@ -298,3 +298,41 @@ def test_help_lists_subcommands(capsys) -> None:
     out = capsys.readouterr().out
     for name in ("wrap", "unwrap", "hub", "dashboard"):
         assert name in out
+
+
+def test_bare_talyx_usage_mentions_help_and_subcommands(capsys) -> None:
+    assert main([]) == 2
+    err = capsys.readouterr().err
+    assert "talyx --help" in err
+    for name in ("wrap", "unwrap", "hub", "dashboard"):
+        assert name in err
+
+
+@pytest.mark.parametrize("args", [["wrap"], ["wrap", "--dry-run"], ["unwrap"]])
+def test_wrap_unwrap_need_claude_cli(sandbox, monkeypatch, capsys, args) -> None:
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None if name == "claude" else "/x")
+    monkeypatch.setattr(cli, "wrap_all", lambda *a, **k: pytest.fail("must not wrap"))
+    monkeypatch.setattr(cli, "unwrap_all", lambda *a, **k: pytest.fail("must not unwrap"))
+    monkeypatch.setattr(cli, "read_entries", lambda *a: pytest.fail("must not read config"))
+    assert main(args) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.splitlines() == ["talyx: claude CLI not found on PATH"]
+    assert list(sandbox.iterdir()) == []  # no backup written
+
+
+@pytest.mark.parametrize(
+    ("args", "command"),
+    [
+        (["node", "server.js"], ["node", "server.js"]),
+        (["-x"], ["-x"]),
+        (["-x", "--flag"], ["-x", "--flag"]),
+        (["--", "--help"], ["--help"]),
+    ],
+)
+def test_backward_compatible_proxy_invocations(monkeypatch, args, command) -> None:
+    called = []
+    monkeypatch.setattr(cli, "_run_subcommand", lambda a: pytest.fail("not a subcommand"))
+    monkeypatch.setattr(cli, "_run_proxy", lambda cmd: called.append(cmd) or 0)
+    assert main(args) == 0
+    assert called == [command]

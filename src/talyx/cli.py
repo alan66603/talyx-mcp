@@ -24,7 +24,10 @@ from talyx.wrap.plan import read_entries
 
 SUBCOMMANDS = ("wrap", "unwrap", "hub", "dashboard")
 
-USAGE = "usage: talyx -- <server command> [args...]"
+USAGE = (
+    "usage: talyx -- <server command> [args...]\n"
+    "       talyx {wrap,unwrap,hub,dashboard} ...  (see talyx --help)"
+)
 
 _HUB_HOST = "127.0.0.1"
 
@@ -169,7 +172,16 @@ def _print_report(report: Report, done: str) -> None:
         _err(f"  failed: {name} ({reason})")
 
 
+def _claude_missing() -> bool:
+    if shutil.which("claude") is None:
+        _err("talyx: claude CLI not found on PATH")
+        return True
+    return False
+
+
 def _cmd_wrap(dry_run: bool) -> int:
+    if _claude_missing():
+        return 1
     talyx_cmd, warning = resolve_talyx_cmd()
     if talyx_cmd is None:
         _err(f"talyx: {warning}")
@@ -190,6 +202,8 @@ def _cmd_wrap(dry_run: bool) -> int:
 
 
 def _cmd_unwrap() -> int:
+    if _claude_missing():
+        return 1
     report = unwrap_all(_claude_json_path(), ClaudeCli(), _backup_path(), _cwd())
     _print_report(report, "restored")
     _err("talyx: restart your Claude Code session for changes to take effect")
@@ -274,7 +288,6 @@ def _run_proxy(command: list[str]) -> int:
         # on_child_down has queued the final ChildDown by now; flush it (bounded).
         if client is not None:
             client.close()
-
 
 
 if __name__ == "__main__":
