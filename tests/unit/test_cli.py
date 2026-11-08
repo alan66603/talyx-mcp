@@ -41,10 +41,10 @@ def test_lifecycle_tracks_liveness_and_inflight_loss() -> None:
     lifecycle = _Lifecycle(tracker, metrics)
 
     lifecycle.up()
-    assert metrics.registry.get_sample_value("talyx_server_up") == 1.0
+    assert metrics.registry.get_sample_value("talyx_server_up", {"server": metrics.server}) == 1.0
 
     lifecycle.down()
-    assert metrics.registry.get_sample_value("talyx_server_up") == 0.0
+    assert metrics.registry.get_sample_value("talyx_server_up", {"server": metrics.server}) == 0.0
     # The in-flight request is lost when the child dies.
     assert (
         metrics.registry.get_sample_value("talyx_inflight_requests_lost_total", {"server": "s"})

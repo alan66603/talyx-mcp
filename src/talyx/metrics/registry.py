@@ -31,13 +31,18 @@ class _ObservableGaugeValue:
     """
 
     def __init__(self) -> None:
-        self._value = 0.0
+        self._values: dict[frozenset[tuple[str, str]], float] = {}
 
-    def set(self, value: float, attributes: object = None) -> None:
-        self._value = float(value)
+    def set(self, value: float, attributes: dict[str, str] | None = None) -> None:
+        self._values[frozenset((attributes or {}).items())] = float(value)
+
+    def remove(self, attributes: dict[str, str] | None = None) -> None:
+        self._values.pop(frozenset((attributes or {}).items()), None)
 
     def _observe(self, _options: CallbackOptions) -> Iterable[Observation]:
-        yield Observation(self._value)
+        for key, value in list(self._values.items()):
+            yield Observation(value, dict(key))
+
 
 # Seconds-scale buckets for request latency.
 _DURATION_BUCKETS = (
@@ -192,13 +197,13 @@ class Metrics:
 _APP_ERROR_CODE = "app_error"
 
 
-def apply_event(metrics: Metrics, event: Event) -> None:
+def apply_event(metrics: Metrics, event: Event, server: str | None = None) -> None:
     """Translate one observed JSON-RPC event into metric updates.
 
     Counts happen at completion so `status`/`error_code` are known; a
     `RequestSeen` on its own carries no outcome and drives no metric.
     """
-    server = metrics.server
+    server = server or metrics.server
     if isinstance(event, RequestCompleted):
         status = "ok" if event.ok else "error"
         metrics.requests.add(1, {"method": event.method, "server": server, "status": status})

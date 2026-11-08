@@ -118,3 +118,23 @@ def test_otlp_endpoint_keeps_prometheus_output() -> None:
     completed(metrics, method="tools/call", ok=True)
     # Prometheus /metrics stays intact when OTLP is also enabled.
     assert sample(metrics, "talyx_requests_total", req("tools/call", "s", "ok")) == 1.0
+
+
+def test_apply_event_uses_explicit_server(scrape) -> None:
+    m = Metrics(server="default")
+    ev = RequestCompleted(method="tools/call", tool=None, duration_seconds=0.1, ok=True)
+    apply_event(m, ev, server="a")
+    apply_event(m, ev, server="b")
+    body = scrape(m)
+    assert 'talyx_requests_total{method="tools/call",server="a",status="ok"} 1.0' in body
+    assert 'talyx_requests_total{method="tools/call",server="b",status="ok"} 1.0' in body
+
+
+def test_server_up_is_labeled_and_removable(scrape) -> None:
+    m = Metrics()
+    m.server_up.set(1, {"server": "a"})
+    m.server_up.set(0, {"server": "b"})
+    assert 'talyx_server_up{server="a"} 1.0' in scrape(m)
+    m.server_up.remove({"server": "a"})
+    body = scrape(m)
+    assert 'server="a"' not in body and 'talyx_server_up{server="b"} 0.0' in body

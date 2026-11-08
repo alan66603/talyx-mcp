@@ -57,10 +57,10 @@ class _Lifecycle:
         self._metrics = metrics
 
     def up(self) -> None:
-        self._metrics.server_up.set(1)
+        self._metrics.server_up.set(1, {"server": self._metrics.server})
 
     def down(self) -> None:
-        self._metrics.server_up.set(0)
+        self._metrics.server_up.set(0, {"server": self._metrics.server})
         # Requests still awaiting a response when the child dies are lost — the
         # server that would have answered them is gone.
         lost = self._tracker.pending_count
