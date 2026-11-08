@@ -8,7 +8,7 @@ from collections.abc import Iterator
 import pytest
 
 from talyx.hub.client import HubClient
-from talyx.hub.wire import ChildUp, ProxyOverhead, encode
+from talyx.hub.wire import ChildDown, ChildUp, ProxyOverhead, encode
 
 
 def free_port() -> int:
@@ -130,8 +130,41 @@ def test_reconnects_after_hub_restart(hubs: list[FakeHub]) -> None:
         c.send("mem", ProxyOverhead(0.5))
     finally:
         c.close(timeout=2.0)
-    assert second.wait_lines(1) == [encode("mem", ProxyOverhead(0.5))]
+    # The restarted hub first learns the server is up, then gets the new events.
+    assert second.wait_lines(2) == [encode("mem", ChildUp()), encode("mem", ProxyOverhead(0.5))]
     assert spawned == [1]
+
+
+def test_first_connect_does_not_duplicate_lifecycle(hubs: list[FakeHub]) -> None:
+    port = free_port()
+    c = HubClient("127.0.0.1", port, spawn=lambda: None, retry_interval=0.05)
+    c.send("mem", ChildUp())  # queued before any hub exists
+    time.sleep(0.1)
+    hub = start_fake_hub(port, hubs)
+    c.send("mem", ProxyOverhead(0.5))
+    c.close(timeout=2.0)
+    assert hub.wait_lines(3, timeout=0.3) == [
+        encode("mem", ChildUp()),
+        encode("mem", ProxyOverhead(0.5)),
+    ]
+
+
+def test_replays_last_lifecycle_per_server(hubs: list[FakeHub]) -> None:
+    port = free_port()
+    first = start_fake_hub(port, hubs)
+    c = HubClient("127.0.0.1", port, spawn=lambda: None, retry_interval=0.05)
+    try:
+        c.send("a", ChildUp())
+        c.send("b", ChildUp())
+        c.send("a", ChildDown(False, 0))
+        assert len(first.wait_lines(3)) == 3
+        first.stop()
+        time.sleep(0.2)
+        second = start_fake_hub(port, hubs)
+        lines = second.wait_lines(2)
+    finally:
+        c.close(timeout=2.0)
+    assert lines == [encode("a", ChildDown(False, 0)), encode("b", ChildUp())]
 
 
 def test_send_never_blocks_when_queue_full() -> None:

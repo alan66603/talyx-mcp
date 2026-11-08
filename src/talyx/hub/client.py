@@ -10,7 +10,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
-from talyx.hub.wire import HubItem, encode
+from talyx.hub.wire import ChildDown, ChildUp, HubItem, encode
 
 _QUEUE_MAX = 10_000
 # Bounds every blocking socket call so the worker always notices close().
@@ -28,7 +28,10 @@ class HubClient:
     queue drops the item (counted in `dropped`). The worker connects, spawns the
     hub at most once per lifetime if nobody is listening, retries every
     `retry_interval`, and reconnects after a write failure (dropping the item it
-    was writing) so a restarted hub is picked up automatically.
+    was writing) so a restarted hub is picked up automatically. The last
+    lifecycle item (`ChildUp` / `ChildDown`) taken off the queue for each server
+    is replayed first on every new connection, so a restarted hub still learns
+    which servers are up.
     """
 
     def __init__(
@@ -42,7 +45,10 @@ class HubClient:
         self._spawn = spawn
         self._spawned = False
         self._retry_interval = retry_interval
-        self._queue: queue.Queue[bytes] = queue.Queue(maxsize=_QUEUE_MAX)
+        # (server, is_lifecycle, encoded line)
+        self._queue: queue.Queue[tuple[str, bool, bytes]] = queue.Queue(maxsize=_QUEUE_MAX)
+        # server -> encoded last lifecycle item; touched only by the worker thread.
+        self._lifecycle: dict[str, bytes] = {}
         self.dropped = 0
         self._closing = threading.Event()
         self._stop = threading.Event()
@@ -51,7 +57,8 @@ class HubClient:
 
     def send(self, server: str, item: HubItem) -> None:
         try:
-            self._queue.put_nowait(encode(server, item))
+            lifecycle = isinstance(item, (ChildUp, ChildDown))
+            self._queue.put_nowait((server, lifecycle, encode(server, item)))
         except Exception:  # noqa: BLE001 - queue.Full, or an unencodable item
             self.dropped += 1
 
@@ -73,11 +80,18 @@ class HubClient:
                     sock = None
                 if sock is None:
                     sock = self._connect()
+                    if sock is not None and not self._replay(sock):
+                        sock.close()
+                        sock = None
                     continue
                 try:
-                    data = self._queue.get(timeout=_POLL)
+                    server, lifecycle, data = self._queue.get(timeout=_POLL)
                 except queue.Empty:
                     continue
+                if lifecycle:
+                    # Remembered before writing: if this write fails, the item is
+                    # replayed on the next connection instead of being lost.
+                    self._lifecycle[server] = data
                 try:
                     sock.sendall(data)
                 except OSError:
@@ -86,6 +100,15 @@ class HubClient:
         finally:
             if sock is not None:
                 sock.close()
+
+    def _replay(self, sock: socket.socket) -> bool:
+        """Send each server's last lifecycle item on a fresh connection."""
+        try:
+            for data in list(self._lifecycle.values()):
+                sock.sendall(data)
+        except OSError:
+            return False
+        return True
 
     def _connect(self) -> socket.socket | None:
         try:
