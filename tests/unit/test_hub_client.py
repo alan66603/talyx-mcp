@@ -165,3 +165,20 @@ def test_spawn_failure_is_swallowed(hubs: list[FakeHub]) -> None:
     hub = start_fake_hub(port, hubs)
     c.close(timeout=2.0)
     assert hub.wait_lines(1) == [encode("mem", ChildUp())]
+
+
+def test_spawn_failure_prints_one_stderr_line(capsys: pytest.CaptureFixture[str]) -> None:
+    def boom() -> None:
+        raise OSError("no python")
+
+    c = HubClient("127.0.0.1", free_port(), spawn=boom, retry_interval=0.02)
+    for _ in range(5):
+        c.send("mem", ChildUp())  # must never raise
+    time.sleep(0.2)  # several failed connect attempts
+    c.close(timeout=0.1)
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err.splitlines() == [
+        "talyx: could not start hub: no python; metrics will not be reported "
+        "(see ~/.talyx/hub.log, or set TALYX_HUB=off)"
+    ]

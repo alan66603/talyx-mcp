@@ -95,8 +95,16 @@ class HubClient:
             self._spawned = True
             try:
                 self._spawn()
-            except Exception:  # noqa: BLE001 - a failed spawn just means no hub
-                pass
+            except Exception as exc:  # noqa: BLE001 - a failed spawn just means no hub
+                # Said once (spawn is attempted once): the proxy itself keeps working.
+                try:
+                    print(
+                        f"talyx: could not start hub: {exc}; metrics will not be reported "
+                        "(see ~/.talyx/hub.log, or set TALYX_HUB=off)",
+                        file=sys.stderr,
+                    )
+                except Exception:  # noqa: BLE001 - stderr may be gone
+                    pass
         self._stop.wait(self._retry_interval)
         return None
 
