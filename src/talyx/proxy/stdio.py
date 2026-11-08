@@ -28,7 +28,8 @@ class StdioProxy:
         on_server_bytes: Callable[[bytes], object] | None = None,
         # Called when the child subprocess comes up / goes down; failures swallowed.
         on_child_up: Callable[[], object] | None = None,
-        # Receives `crashed`: True if the child exited before the client closed stdin.
+        # Receives `crashed`: True if the child exited before the client closed
+        # stdin and without a forwarded SIGINT/SIGTERM asking it to stop.
         on_child_down: Callable[[bool], object] | None = None,
     ) -> None:
         self._command = command
@@ -39,6 +40,8 @@ class StdioProxy:
         self._on_child_down = on_child_down
         # Set only by a real EOF read on our stdin, never by task cancellation.
         self._client_closed = False
+        # Set when we relay SIGINT/SIGTERM: the parent asked for the shutdown.
+        self._stop_requested = False
 
     async def run(self) -> int:
         try:
@@ -61,7 +64,8 @@ class StdioProxy:
         finally:
             for sig in _FORWARDED_SIGNALS:
                 loop.remove_signal_handler(sig)
-            self._notify(self._on_child_down, not self._client_closed)
+            crashed = not (self._client_closed or self._stop_requested)
+            self._notify(self._on_child_down, crashed)
 
     async def _pump_until_exit(self) -> int:
         assert self._proc is not None
@@ -186,6 +190,7 @@ class StdioProxy:
             print(f"talyx: lifecycle callback error ignored: {exc!r}", file=sys.stderr)
 
     def _forward_signal(self, sig: signal.Signals) -> None:
+        self._stop_requested = True
         if self._proc is not None and self._proc.returncode is None:
             with contextlib.suppress(ProcessLookupError):
                 self._proc.send_signal(sig)

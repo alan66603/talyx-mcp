@@ -104,3 +104,23 @@ def test_child_exit_after_stdin_eof_is_clean() -> None:
     proxy = run_driver("cat")
     _, err = proxy.communicate(input=b"hello\n", timeout=TIMEOUT)
     assert b"CRASHED=False" in err
+
+
+def test_sigterm_shutdown_is_not_a_crash() -> None:
+    # Older MCP clients stop a stdio server with SIGTERM while stdin stays open.
+    code = (
+        "import signal, sys, time\n"
+        "signal.signal(signal.SIGTERM, lambda *a: sys.exit(0))\n"
+        "print('ready', flush=True)\n"
+        "time.sleep(30)\n"
+    )
+    proxy = run_driver(sys.executable, "-c", code)
+    assert proxy.stdin is not None and proxy.stdout is not None and proxy.stderr is not None
+    assert proxy.stdout.readline() == b"ready\n"
+    proxy.send_signal(signal.SIGTERM)
+    proxy.wait(timeout=TIMEOUT)
+    err = proxy.stderr.read()
+    proxy.stdin.close()
+    proxy.stdout.close()
+    proxy.stderr.close()
+    assert b"CRASHED=False" in err
