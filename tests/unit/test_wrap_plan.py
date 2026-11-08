@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from talyx.wrap.plan import (
     MCP_REMOTE_PIN,
     ServerEntry,
@@ -37,6 +39,14 @@ def test_user_server_name_wins() -> None:
 
 def test_already_wrapped_is_skipped() -> None:
     e = ServerEntry("mem", "user", {"type": "stdio", "command": "/x/talyx", "args": ["--", "a"]})
+    r = plan_wrap(e, "/bin/talyx")
+    assert isinstance(r, Skip)
+    assert "already wrapped" in r.reason
+
+
+@pytest.mark.parametrize("cmd", ["/x/talyx.exe", "C:\\x\\talyx.exe", "C:\\x\\TALYX.EXE"])
+def test_already_wrapped_windows_exe_is_skipped(cmd: str) -> None:
+    e = ServerEntry("mem", "user", {"type": "stdio", "command": cmd, "args": ["--", "a"]})
     r = plan_wrap(e, "/bin/talyx")
     assert isinstance(r, Skip)
     assert "already wrapped" in r.reason

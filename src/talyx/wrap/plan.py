@@ -63,6 +63,11 @@ def _wrapped(entry: ServerEntry, talyx_cmd: str, argv: list[str]) -> Wrap:
     return Wrap(entry, {"type": "stdio", "command": talyx_cmd, "args": ["--", *argv], "env": env})
 
 
+def _is_talyx(command: str) -> bool:
+    base = command.replace("\\", "/").rsplit("/", 1)[-1].lower()
+    return base in {"talyx", "talyx.exe"}
+
+
 def plan_wrap(entry: ServerEntry, talyx_cmd: str) -> Wrap | Skip:
     spec = entry.spec
     kind = spec.get("type", "stdio")
@@ -70,7 +75,7 @@ def plan_wrap(entry: ServerEntry, talyx_cmd: str) -> Wrap | Skip:
         command = spec.get("command")
         if not command:
             return Skip(entry, "stdio server has no command")
-        if command == talyx_cmd or Path(command).name == "talyx":
+        if command == talyx_cmd or _is_talyx(command):
             return Skip(entry, "already wrapped by talyx")
         return _wrapped(entry, talyx_cmd, [command, *(spec.get("args") or [])])
     if kind == "http":
