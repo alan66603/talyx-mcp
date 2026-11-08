@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 
-from talyx.proxy.jsonrpc import RequestCompleted, RequestSeen, SessionTracker
+from talyx.proxy.jsonrpc import RequestCompleted, RequestSeen, TrafficObserver
 
 
 class FakeClock:
@@ -16,9 +16,9 @@ class FakeClock:
         self.now += seconds
 
 
-def make_tracker(ttl: float = 300.0) -> tuple[SessionTracker, FakeClock]:
+def make_tracker(ttl: float = 300.0) -> tuple[TrafficObserver, FakeClock]:
     clock = FakeClock()
-    return SessionTracker(ttl_seconds=ttl, clock=clock), clock
+    return TrafficObserver(ttl_seconds=ttl, clock=clock), clock
 
 
 def line(msg: dict) -> bytes:

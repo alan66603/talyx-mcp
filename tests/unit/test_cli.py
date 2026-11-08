@@ -4,7 +4,7 @@ import json
 
 from talyx.cli import _Lifecycle, main, parse_command
 from talyx.metrics.registry import Metrics
-from talyx.proxy.jsonrpc import SessionTracker
+from talyx.proxy.jsonrpc import TrafficObserver
 
 
 def test_parse_strips_leading_separator() -> None:
@@ -33,7 +33,7 @@ def test_main_without_command_prints_usage(capsys) -> None:
 
 def test_lifecycle_tracks_liveness_and_inflight_loss() -> None:
     metrics = Metrics(server="s")
-    tracker = SessionTracker()
+    tracker = TrafficObserver()
     # One request in flight with no response yet.
     tracker.feed_client(
         (json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/call"}) + "\n").encode()

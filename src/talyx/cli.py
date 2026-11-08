@@ -9,7 +9,7 @@ from time import perf_counter
 from talyx.config import Config
 from talyx.metrics.registry import Metrics, apply_event
 from talyx.metrics.server import start_metrics_server
-from talyx.proxy.jsonrpc import Event, SessionTracker
+from talyx.proxy.jsonrpc import Event, TrafficObserver
 from talyx.proxy.stdio import StdioProxy
 
 USAGE = "usage: talyx -- <server command> [args...]"
@@ -32,7 +32,7 @@ def server_name(config: Config, command: list[str]) -> str:
 class _Recorder:
     """Bridges observed traffic to metrics, timing its own overhead per chunk."""
 
-    def __init__(self, tracker: SessionTracker, metrics: Metrics) -> None:
+    def __init__(self, tracker: TrafficObserver, metrics: Metrics) -> None:
         self._tracker = tracker
         self._metrics = metrics
 
@@ -52,7 +52,7 @@ class _Recorder:
 class _Lifecycle:
     """Basic liveness: child up/down, and in-flight loss when the child dies."""
 
-    def __init__(self, tracker: SessionTracker, metrics: Metrics) -> None:
+    def __init__(self, tracker: TrafficObserver, metrics: Metrics) -> None:
         self._tracker = tracker
         self._metrics = metrics
 
@@ -80,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     start_metrics_server(metrics, config.metrics_host, config.metrics_port)
 
-    tracker = SessionTracker(abandon_timeout_seconds=config.abandoned_timeout_seconds)
+    tracker = TrafficObserver(abandon_timeout_seconds=config.abandoned_timeout_seconds)
     recorder = _Recorder(tracker, metrics)
     lifecycle = _Lifecycle(tracker, metrics)
     proxy = StdioProxy(
