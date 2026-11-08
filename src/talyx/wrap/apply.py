@@ -67,7 +67,7 @@ def _load(backup: Path) -> list[dict[str, Any]]:
     try:
         data = json.loads(text)
     except ValueError as e:
-        raise BackupError(f"backup {backup} is not valid JSON: {e}") from e
+        raise BackupError(f"backup {backup} is not valid JSON: {e}; {_recover(backup)}") from e
     records = data.get("records") if isinstance(data, dict) else None
     if (
         not isinstance(data, dict)
@@ -75,8 +75,14 @@ def _load(backup: Path) -> list[dict[str, Any]]:
         or not isinstance(records, list)
         or not all(isinstance(r, dict) for r in records)
     ):
-        raise BackupError(f"backup {backup} has an unrecognised shape or version")
+        raise BackupError(
+            f"backup {backup} has an unrecognised shape or version; {_recover(backup)}"
+        )
     return records
+
+
+def _recover(backup: Path) -> str:
+    return f"move or delete {backup} after checking its contents"
 
 
 def _save(backup: Path, records: list[dict[str, Any]]) -> None:

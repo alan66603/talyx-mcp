@@ -251,6 +251,7 @@ import pytest  # noqa: E402
 from talyx.wrap.apply import BackupError  # noqa: E402
 
 BAD_BACKUPS = [
+    "",
     "not json{",
     json.dumps({"version": 1}),
     json.dumps({"version": 1, "records": "x"}),
@@ -287,3 +288,12 @@ def test_claude_cli_timeout_and_stdin(tmp_path: Path) -> None:
     ClaudeCli(ok).remove("m", "user", tmp_path)
     assert seen[0]["stdin"] == subprocess.DEVNULL and seen[0]["timeout"] == 60
     assert ClaudeCli(hang).remove("m", "user", tmp_path) is False
+
+
+@pytest.mark.parametrize("content", BAD_BACKUPS)
+def test_untrusted_backup_error_says_how_to_recover(tmp_path: Path, content: str) -> None:
+    backup = tmp_path / "b.json"
+    backup.write_text(content)
+    with pytest.raises(BackupError) as info:
+        wrap_all([stdio_entry("mem")], "/bin/talyx", FakeCli(), backup, tmp_path)  # type: ignore[arg-type]
+    assert str(info.value).endswith(f"move or delete {backup} after checking its contents")
