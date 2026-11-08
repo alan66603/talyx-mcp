@@ -66,3 +66,20 @@ def test_stack_ports_bind_localhost_only() -> None:
     for port in ("3000", "9090", "9093"):
         assert f'"127.0.0.1:{port}:{port}"' in compose
         assert f'"{port}:{port}"' not in compose
+
+
+_REPO = Path(__file__).resolve().parents[2]
+
+
+def test_server_up_panel_and_alert_are_per_server() -> None:
+    import json
+
+    dash = json.loads((_REPO / "dashboards/mcp-overview.json").read_text())
+    panel = next(p for p in dash["panels"] if p["title"] == "Server Up")
+    target = panel["targets"][0]
+    assert target["expr"] == "talyx_server_up"
+    assert target["legendFormat"] == "{{server}}"
+    rules = (_REPO / "alerts/mcp-rules.yaml").read_text()
+    down = rules.split("alert: MCPServerDown", 1)[1].split("- alert:", 1)[0]
+    assert "$labels.server" in down
+    assert "$labels.instance" not in down

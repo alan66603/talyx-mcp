@@ -10,9 +10,9 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "MCP server subprocess is down"
+          summary: "MCP server {{ $labels.server }} is down"
           description: >
-            talyx_server_up has been 0 for over 1m on {{ $labels.instance }} —
+            talyx_server_up has been 0 for over 1m for server {{ $labels.server }} —
             the wrapped MCP server is not running.
 
       # The exporter itself is unreachable — Prometheus can't scrape /metrics.
