@@ -10,6 +10,7 @@ from collections.abc import Callable
 from pathlib import Path
 from time import perf_counter
 
+from talyx import dashboard
 from talyx.config import Config
 from talyx.hub.client import HubClient, spawn_hub
 from talyx.hub.server import run_hub
@@ -143,6 +144,10 @@ def _claude_json_path() -> Path:
     return Path.home() / ".claude.json"
 
 
+def _talyx_home() -> Path:
+    return Path.home() / ".talyx"
+
+
 def _backup_path() -> Path:
     return Path.home() / ".talyx" / "wrap-backup.json"
 
@@ -201,7 +206,8 @@ def _build_parser() -> argparse.ArgumentParser:
     wrap.add_argument("--dry-run", action="store_true", help="show the plan, change nothing")
     sub.add_parser("unwrap", help="restore the MCP servers that `talyx wrap` rewrote")
     sub.add_parser("hub", help="run the shared metrics hub")
-    sub.add_parser("dashboard", help="start/stop the bundled dashboard (not available yet)")
+    dash = sub.add_parser("dashboard", help="start/stop the bundled Prometheus/Grafana stack")
+    dash.add_argument("action", choices=("up", "down"), help="start or stop the stack")
     return parser
 
 
@@ -217,8 +223,7 @@ def _run_subcommand(args: list[str]) -> int:
             return _cmd_unwrap()
         if ns.subcommand == "hub":
             return run_hub(Config.from_env())
-        _err("talyx: dashboard not available yet")
-        return 2
+        return dashboard.up(_talyx_home()) if ns.action == "up" else dashboard.down(_talyx_home())
     except (BackupError, json.JSONDecodeError, OSError) as e:
         _err(f"talyx: {e}")
         return 1

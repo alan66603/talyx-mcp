@@ -251,11 +251,18 @@ def test_hub_subcommand_runs_hub(monkeypatch) -> None:
     assert main(["hub"]) == 7
 
 
-def test_dashboard_placeholder(capsys) -> None:
+def test_dashboard_dispatches_up_and_down(tmp_path, monkeypatch) -> None:
+    seen = []
+    monkeypatch.setattr(cli, "_talyx_home", lambda: tmp_path)
+    monkeypatch.setattr(cli.dashboard, "up", lambda home: seen.append(("up", home)) or 0)
+    monkeypatch.setattr(cli.dashboard, "down", lambda home: seen.append(("down", home)) or 3)
+    assert main(["dashboard", "up"]) == 0
+    assert main(["dashboard", "down"]) == 3
+    assert seen == [("up", tmp_path), ("down", tmp_path)]
+
+
+def test_dashboard_requires_action() -> None:
     assert main(["dashboard"]) == 2
-    captured = capsys.readouterr()
-    assert captured.out == ""
-    assert "dashboard not available yet" in captured.err
 
 
 def test_venv_talyx_warns(tmp_path, monkeypatch) -> None:
@@ -281,7 +288,8 @@ def test_subcommand_output_never_on_stdout(sandbox, monkeypatch, capsys) -> None
     monkeypatch.setattr(cli, "unwrap_all", lambda *a, **k: Report(wrapped=["a"]))
     main(["wrap"])
     main(["unwrap"])
-    main(["dashboard"])
+    monkeypatch.setattr(cli.dashboard, "up", lambda home: 0)
+    main(["dashboard", "up"])
     assert capsys.readouterr().out == ""
 
 
