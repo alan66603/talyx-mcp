@@ -115,7 +115,7 @@ def _peer_closed(sock: socket.socket) -> bool:
 def spawn_hub() -> None:
     """Start a detached `python -m talyx hub`, logging to ~/.talyx/hub.log."""
     log_dir = Path.home() / ".talyx"
-    log_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True, mode=0o700)
     with open(log_dir / "hub.log", "ab") as log:
         subprocess.Popen(
             [sys.executable, "-m", "talyx", "hub"],

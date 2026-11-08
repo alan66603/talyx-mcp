@@ -208,3 +208,75 @@ def test_claude_cli_failure_and_missing_binary(tmp_path: Path) -> None:
 
     assert ClaudeCli(bad).remove("m", "user", tmp_path) is False
     assert ClaudeCli(missing).remove("m", "user", tmp_path) is False
+
+
+def test_existing_dir_is_tightened(tmp_path: Path) -> None:
+    d = tmp_path / "dot"
+    d.mkdir()
+    d.chmod(0o755)
+    wrap_all([stdio_entry("mem")], "/bin/talyx", FakeCli(), d / "b.json", tmp_path)  # type: ignore[arg-type]
+    assert stat.S_IMODE(d.stat().st_mode) == 0o700
+    assert stat.S_IMODE((d / "b.json").stat().st_mode) == 0o600
+
+
+def test_unwrap_putback_failure_reported(tmp_path: Path) -> None:
+    backup = tmp_path / "b.json"
+    cli = FakeCli()
+    wrap_all([stdio_entry("mem")], "/bin/talyx", cli, backup, tmp_path)  # type: ignore[arg-type]
+    cj = tmp_path / "claude.json"
+    _write_claude_json(cj, {"mem": cli.specs[0]})
+    cli2 = FakeCli(fail_on=[("add_json", 1), ("add_json", 2)])
+    r = unwrap_all(cj, cli2, backup, tmp_path)  # type: ignore[arg-type]
+    assert r.failed == [("mem", "restore failed and put-back failed; original kept in backup")]
+    assert len(records(backup)) == 1
+
+
+def test_user_scope_record_ignores_cwd(tmp_path: Path) -> None:
+    backup = tmp_path / "b.json"
+    a, b = tmp_path / "a", tmp_path / "b"
+    wrap_all([stdio_entry("mem")], "/bin/talyx", FakeCli(), backup, a)  # type: ignore[arg-type]
+    wrap_all([stdio_entry("mem")], "/bin/talyx", FakeCli(), backup, b)  # type: ignore[arg-type]
+    assert len(records(backup)) == 1
+
+
+import pytest  # noqa: E402
+
+from talyx.wrap.apply import BackupError  # noqa: E402
+
+BAD_BACKUPS = [
+    "not json{",
+    json.dumps({"version": 1}),
+    json.dumps({"version": 1, "records": "x"}),
+    json.dumps({"version": 1, "records": [1]}),
+    json.dumps({"version": 2, "records": []}),
+    json.dumps([]),
+]
+
+
+@pytest.mark.parametrize("content", BAD_BACKUPS)
+def test_untrusted_backup_is_never_overwritten(tmp_path: Path, content: str) -> None:
+    backup = tmp_path / "b.json"
+    backup.write_text(content)
+    cli = FakeCli()
+    with pytest.raises(BackupError):
+        wrap_all([stdio_entry("mem")], "/bin/talyx", cli, backup, tmp_path)  # type: ignore[arg-type]
+    cj = tmp_path / "claude.json"
+    _write_claude_json(cj, {})
+    with pytest.raises(BackupError):
+        unwrap_all(cj, cli, backup, tmp_path)  # type: ignore[arg-type]
+    assert cli.calls == [] and backup.read_text() == content
+
+
+def test_claude_cli_timeout_and_stdin(tmp_path: Path) -> None:
+    seen: list[dict[str, Any]] = []
+
+    def ok(argv: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
+        seen.append(kw)
+        return subprocess.CompletedProcess(argv, 0, "", "")
+
+    def hang(argv: list[str], **kw: Any) -> subprocess.CompletedProcess[str]:
+        raise subprocess.TimeoutExpired(argv, 60)
+
+    ClaudeCli(ok).remove("m", "user", tmp_path)
+    assert seen[0]["stdin"] == subprocess.DEVNULL and seen[0]["timeout"] == 60
+    assert ClaudeCli(hang).remove("m", "user", tmp_path) is False

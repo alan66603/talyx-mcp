@@ -13,6 +13,11 @@ from typing import Any
 from talyx.wrap.plan import Scope, ServerEntry, Skip, plan_wrap, read_entries
 
 BACKUP_VERSION = 1
+CLI_TIMEOUT_S = 60
+
+
+class BackupError(Exception):
+    """The backup file exists but cannot be trusted; it is never overwritten."""
 
 
 class ClaudeCli:
@@ -25,8 +30,15 @@ class ClaudeCli:
 
     def _exec(self, argv: list[str], cwd: Path) -> bool:
         try:
-            proc = self._run(argv, cwd=cwd, capture_output=True, text=True)
-        except OSError:
+            proc = self._run(
+                argv,
+                cwd=cwd,
+                capture_output=True,
+                text=True,
+                stdin=subprocess.DEVNULL,
+                timeout=CLI_TIMEOUT_S,
+            )
+        except (OSError, subprocess.TimeoutExpired):
             return False
         return proc.returncode == 0
 
@@ -47,16 +59,30 @@ class Report:
 
 def _load(backup: Path) -> list[dict[str, Any]]:
     try:
-        data = json.loads(backup.read_text())
+        text = backup.read_text()
     except FileNotFoundError:
         return []
+    except OSError as e:
+        raise BackupError(f"cannot read backup {backup}: {e}") from e
+    try:
+        data = json.loads(text)
+    except ValueError as e:
+        raise BackupError(f"backup {backup} is not valid JSON: {e}") from e
     records = data.get("records") if isinstance(data, dict) else None
-    return [r for r in records if isinstance(r, dict)] if isinstance(records, list) else []
+    if (
+        not isinstance(data, dict)
+        or data.get("version") != BACKUP_VERSION
+        or not isinstance(records, list)
+        or not all(isinstance(r, dict) for r in records)
+    ):
+        raise BackupError(f"backup {backup} has an unrecognised shape or version")
+    return records
 
 
 def _save(backup: Path, records: list[dict[str, Any]]) -> None:
     """Durable atomic write: tmp file (0600) + fsync + os.replace."""
     backup.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(backup.parent, 0o700)
     tmp = backup.with_name(backup.name + ".tmp")
     payload = json.dumps({"version": BACKUP_VERSION, "records": records}, indent=2)
     fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
@@ -73,7 +99,9 @@ def _save(backup: Path, records: list[dict[str, Any]]) -> None:
 
 
 def _same(rec: dict[str, Any], name: str, scope: str, cwd: str) -> bool:
-    return rec.get("name") == name and rec.get("scope") == scope and rec.get("cwd") == cwd
+    if rec.get("name") != name or rec.get("scope") != scope:
+        return False
+    return scope == "user" or rec.get("cwd") == cwd
 
 
 def _drop(backup: Path, name: str, scope: str, cwd: str) -> None:
@@ -90,6 +118,8 @@ def wrap_all(
 ) -> Report:
     report = Report()
     cwd_s = str(cwd)
+    if not dry_run:
+        _load(backup)  # fail fast on an untrusted backup, before any CLI call
     for entry in entries:
         plan = plan_wrap(entry, talyx_cmd)
         if isinstance(plan, Skip):
@@ -139,8 +169,9 @@ def _cwd_matches(record_cwd: Any, cwd: Path) -> bool:
 
 def unwrap_all(claude_json: Path, cli: ClaudeCli, backup: Path, cwd: Path) -> Report:
     report = Report()
+    saved = _load(backup)
     current = {(e.name, e.scope): e.spec for e in read_entries(claude_json, cwd)}
-    for rec in _load(backup):
+    for rec in saved:
         name, scope = rec.get("name"), rec.get("scope")
         if not isinstance(name, str) or scope not in ("user", "local"):
             continue
@@ -165,6 +196,10 @@ def unwrap_all(claude_json: Path, cli: ClaudeCli, backup: Path, cwd: Path) -> Re
             report.wrapped.append(name)
             _drop(backup, name, scope, rec_cwd)
         else:
-            cli.add_json(name, scope, rec["wrapped"], cwd)
-            report.failed.append((name, "restoring original failed; wrapped spec put back"))
+            if cli.add_json(name, scope, rec["wrapped"], cwd):
+                report.failed.append((name, "restoring original failed; wrapped spec put back"))
+            else:
+                report.failed.append(
+                    (name, "restore failed and put-back failed; original kept in backup")
+                )
     return report
