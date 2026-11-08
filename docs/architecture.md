@@ -59,6 +59,42 @@ The pump forwards bytes untouched in both directions; observation is a
 side-channel. If parsing ever fails, forwarding is unaffected — correctness of
 the proxy never depends on what the tracker understands.
 
+### Hub
+
+Each wrapper (`talyx -- <cmd>`) ships its events to one long-lived hub instead
+of exposing its own port:
+
+```mermaid
+flowchart LR
+    c1["MCP client A"] <--> w1["talyx wrapper"] <--> s1["server A"]
+    c2["MCP client B"] <--> w2["talyx wrapper"] <--> s2["server B"]
+    w1 -->|"events, TCP 127.0.0.1:9465"| hub["talyx hub<br/>(auto-spawned)"]
+    w2 -->|"events, TCP 127.0.0.1:9465"| hub
+    hub -->|"/metrics :9464"| prom["Prometheus"]
+    hub -.->|"optional OTLP"| otlp["OTel Collector"]
+```
+
+- The hub is auto-spawned by the first wrapper (or by `talyx dashboard up`) and
+  owns the single `/metrics` on 9464 and `TALYX_OTLP_ENDPOINT`. Port 9465 is
+  `TALYX_HUB_PORT`; the hub log is `~/.talyx/hub.log`.
+- Wrappers queue events and send them once the hub is up. Nothing falls back to
+  a local port unless `TALYX_HUB=off`, which restores per-process `/metrics`.
+- **What crosses the wire:** event fields only (method name, tool name,
+  durations, `wait_type`, error codes). Never parameters, results, or
+  `requestState`; the correlation hash stays inside the wrapper's memory.
+
+### `server_up` semantics
+
+`talyx_server_up{server}` separates a clean exit from a crash, otherwise every
+closed Claude Code session would look like a dead server:
+
+- Client closes first, server then exits normally: **clean**. The series is
+  removed; no alert.
+- Client still connected, server exits by itself: **crash**. The gauge goes to
+  `0` and the "server down" alert can fire.
+- Edge case: if the client closes and the server later crashes on its own, it is
+  still reported as clean.
+
 ## Design invariants
 
 - **stdout carries only the server's JSON-RPC.** All of the proxy's own logging

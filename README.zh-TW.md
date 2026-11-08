@@ -29,7 +29,10 @@ flowchart LR
 - [talyx-mcp](#talyx-mcp)
   - [目錄](#目錄)
   - [Quick Start](#quick-start)
-  - [安裝](#安裝)
+    - [talyx 包不了的 server](#talyx-包不了的-server)
+  - [Demo](#demo)
+  - [安裝與手動使用](#安裝與手動使用)
+  - [Hub](#hub)
   - [指標](#指標)
   - [運作方式](#運作方式)
   - [Roadmap](#roadmap)
@@ -37,6 +40,46 @@ flowchart LR
   - [作者](#作者)
 
 ## Quick Start
+
+給 Claude Code 使用者，三行指令：
+
+```bash
+uv tool install talyx-mcp   # 全域安裝（見下方說明）
+talyx wrap                  # 包住你現有的 Claude Code MCP server
+talyx dashboard up          # Prometheus + Alertmanager + Grafana，一行啟動
+```
+
+打開 **http://localhost:3000**（Grafana）或 **http://localhost:9090**（Prometheus）。
+`talyx wrap` 在**新開的** Claude Code session 才會生效。
+
+- `talyx wrap --dry-run` 只顯示會改什麼，不動任何設定。`talyx unwrap` 還原原本的設定。
+- `wrap` 會透過 `claude mcp remove` / `add-json` 改寫你自己的 Claude Code MCP server
+  （user scope 與目前目錄的 local scope），原始設定備份在 `~/.talyx/wrap-backup.json`
+  （權限 0600，目錄 0700）。請注意：`wrap` / `unwrap` 執行期間，`claude mcp add-json`
+  會把 server 設定（包含 `env`）當成命令列參數收到，而同樣的值本來就存在
+  `~/.claude.json` 裡；備份檔並不是這些值唯一出現的地方。
+- 請全域安裝 talyx（`uv tool install talyx-mcp`）。若 `talyx` 解析到虛擬環境內，`wrap`
+  會警告，因為被包住的指令必須在虛擬環境外也能執行。
+- `talyx dashboard down` 會停掉整組服務；資料保存在具名 Docker volume，down/up 之間不會
+  消失。這組服務需要 **Docker**，以 compose project `talyx-dashboard` 執行；`up` 也會順便
+  確保 hub 在跑。
+- dashboard 與下方 demo 堆疊使用相同埠號（9090 / 3000 / 9093，指標用 9464）。
+  一次只能開其中一組，另一組要先停掉。
+
+### talyx 包不了的 server
+
+`talyx wrap` 會跳過下列項目並說明原因：
+
+- **Plugin 帶的 server**（由 plugin 管理，不在你的設定裡）。
+- **claude.ai connector。**
+- **Project scope**（`.mcp.json`）：包下去會把你個人的絕對路徑提交進共用檔案。
+- **帶 headers 的 URL（http）server**：talyx 不會把憑證搬進命令列參數。
+- **sse server。**
+
+*不帶* headers 的 http server 會改用 `npx -y mcp-remote@0.16.5 <url>` 包起來。那是第三方
+套件；若 server 走 OAuth，請先在終端機單獨執行一次來登入。
+
+## Demo
 
 一行指令跑起 talyx + 一個範例 MCP server + Prometheus + Alertmanager + Grafana，
 外加即時流量：
@@ -52,7 +95,7 @@ docker compose -f deploy/compose/demo.yaml up --build
 ——elicitation 循環、每個請求的往返次數，還有 **abandoned cycles**（agent 靜默卡在
 等一個永遠不來的確認）——全部即時更新。Prometheus 在 `:9090`，Alertmanager 在 `:9093`。
 
-## 安裝
+## 安裝與手動使用
 
 ```bash
 pip install talyx-mcp
@@ -77,13 +120,31 @@ pip install .
 { "command": "talyx", "args": ["--", "npx", "-y", "@modelcontextprotocol/server-everything"] }
 ```
 
-指標就會在 `http://localhost:9464/metrics`。用 `TALYX_METRICS_PORT` /
-`TALYX_METRICS_HOST` 設定埠號。若還想把指標推到 OTLP，設 `TALYX_OTLP_ENDPOINT`
+這個 `talyx -- <cmd>` 寫法是底層機制；`talyx wrap` 只是幫你把設定改寫成這種形式。
+
+指標就會在 `http://localhost:9464/metrics`，由 hub（見下一節）提供。用
+`TALYX_METRICS_PORT` / `TALYX_METRICS_HOST` 設定埠號。若還想把指標推到 OTLP，設 `TALYX_OTLP_ENDPOINT`
 並裝上額外相依：`pip install 'talyx-mcp[otlp]'`（Prometheus `/metrics` 一律照常開著）。
 
 > 招牌的循環指標需要一個講 MCP `2026-07-28`（會回 `InputRequiredResult`）的 server。
 > 包在舊 server 上仍能拿到核心可靠性指標；想看循環面板，可以用內附的 mock server：
 > `talyx -- python -m talyx.mock.server`。
+
+## Hub
+
+每個 `talyx -- <cmd>` 包裝程序都會把事件經由本機 TCP（`127.0.0.1:9465`，
+`TALYX_HUB_PORT`）送到**一個**常駐 hub（talyx 自動啟動，即 `talyx hub`）。hub 負責
+唯一的 `/metrics`（`:9464`），也負責處理 `TALYX_OTLP_ENDPOINT`，所以多個 MCP server
+（與多個 Claude Code session）會匯集在同一處，而不是搶同一個埠。事件會先排隊，hub 一起來
+就送出；除非設 `TALYX_HUB=off`（恢復舊的每程序各開 `/metrics`），否則不會退回本機埠。
+hub 的 log 在 `~/.talyx/hub.log`。
+
+hub 只收事件欄位（方法名、tool 名、耗時、`wait_type`、錯誤碼），不收參數、結果或
+`requestState`。
+
+`talyx_server_up` 會區分正常結束與崩潰：client 先關閉、server 隨後正常結束，該序列會被
+移除、不告警；client 仍連線、server 自己結束，則設為 `0`。邊界情況：若 client 關閉後
+server 才自行崩潰，仍會被視為正常結束。
 
 ## 指標
 
@@ -118,8 +179,8 @@ pip install .
 只是離開)，但比率異常升高可能表示提示壞了或令人困惑，在高風險的
 `InputRequiredResult` 把關處值得參考。
 
-**隱私與安全：** Talyx **不記錄任何 tool 參數**、不記錄訊息內容，只取 method/tool
-名稱、結果與時間。它唯一需要的關聯鍵（密封的 `requestState` token）**在記憶體內雜湊、
+**隱私與安全：** Talyx **不記錄 tool 參數內容**、不記錄訊息內容，只讀取 method/tool
+名稱、結果與時間。hub 也只收這些事件欄位，不收參數、結果或 `requestState`。它唯一需要的關聯鍵（密封的 `requestState` token）**在記憶體內雜湊、
 絕不落地**。詳見 [docs/metrics.zh-TW.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.zh-TW.md)。
 
 **額外開銷：** talyx 自身每個 chunk 的處理是次毫秒等級（`talyx_proxy_overhead_seconds`），

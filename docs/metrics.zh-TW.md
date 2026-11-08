@@ -37,7 +37,7 @@ Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記
 
 | 指標 | 型別 | Labels | 意義 |
 |---|---|---|---|
-| `talyx_server_up` | gauge | — | 被包住的 server 子行程活著時為 `1`，否則 `0`。 |
+| `talyx_server_up` | gauge | `server` | 被包住的 server 子行程活著時為 `1`；client 仍連線時 server 自行結束（崩潰）則為 `0`。client 先關閉後的正常結束會移除該序列（視為正常，不告警）。 |
 | `talyx_inflight_requests_lost_total` | counter | `server` | 子行程掛掉時，還在進行中而遺失的請求數。 |
 | `talyx_proxy_overhead_seconds` | histogram | — | talyx 觀測每個轉發 chunk 所花的實際時間。 |
 

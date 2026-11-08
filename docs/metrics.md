@@ -40,7 +40,7 @@ human/client) or `poll` (state-only — the server asked the client to retry).
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `talyx_server_up` | gauge | — | `1` while the wrapped server subprocess is alive, else `0`. |
+| `talyx_server_up` | gauge | `server` | `1` while the wrapped server subprocess is alive; `0` if it exits by itself while the client is still connected (crash). A normal exit after the client closed removes the series (clean, no alert). |
 | `talyx_inflight_requests_lost_total` | counter | `server` | In-flight requests dropped when the subprocess went down. |
 | `talyx_proxy_overhead_seconds` | histogram | — | Wall-clock time talyx spends observing each forwarded chunk. |
 

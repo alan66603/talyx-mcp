@@ -40,6 +40,37 @@ Trace 與 metrics 是**互補**的——就像 Jaeger 與 Prometheus 在一般 o
 pump 在兩個方向都原封轉發位元組；觀測是旁路（side-channel）。就算解析失敗，轉發也不
 受影響——proxy 的正確性不取決於 tracker 理解了什麼。
 
+### Hub
+
+每個包裝程序（`talyx -- <cmd>`）不再自己開埠，而是把事件送到一個常駐 hub：
+
+```mermaid
+flowchart LR
+    c1["MCP client A"] <--> w1["talyx wrapper"] <--> s1["server A"]
+    c2["MCP client B"] <--> w2["talyx wrapper"] <--> s2["server B"]
+    w1 -->|"事件, TCP 127.0.0.1:9465"| hub["talyx hub<br/>(自動啟動)"]
+    w2 -->|"事件, TCP 127.0.0.1:9465"| hub
+    hub -->|"/metrics :9464"| prom["Prometheus"]
+    hub -.->|"可選 OTLP"| otlp["OTel Collector"]
+```
+
+- hub 由第一個包裝程序（或 `talyx dashboard up`）自動啟動，持有唯一的 `/metrics`
+  （9464）與 `TALYX_OTLP_ENDPOINT`。9465 是 `TALYX_HUB_PORT`；hub 的 log 在
+  `~/.talyx/hub.log`。
+- 包裝程序會先把事件排隊，hub 一起來就送出。除非設 `TALYX_HUB=off`（恢復每程序各開
+  `/metrics`），否則不會退回本機埠。
+- **線上傳的內容：** 只有事件欄位（方法名、tool 名、耗時、`wait_type`、錯誤碼），
+  絕不含參數、結果或 `requestState`；關聯用的雜湊只留在包裝程序的記憶體內。
+
+### `server_up` 語意
+
+`talyx_server_up{server}` 區分正常結束與崩潰，否則每關一次 Claude Code session 都會
+像是 server 死掉：
+
+- client 先關閉、server 隨後正常結束：**正常結束**。該序列被移除，不告警。
+- client 仍連線、server 自己結束：**崩潰**。gauge 設為 `0`，可觸發「server 死亡」告警。
+- 邊界情況：若 client 關閉後 server 才自行崩潰，仍會被視為正常結束。
+
 ## 設計不變式（invariants）
 
 - **stdout 只承載 server 的 JSON-RPC。** proxy 自己的所有 log 都走 stderr；stdout 上
