@@ -86,7 +86,7 @@ class Hub:
 
 
 async def _run(config: Config) -> int:
-    metrics = Metrics()
+    metrics = Metrics(otlp_endpoint=config.otlp_endpoint)
     try:
         ingest = await Hub(metrics).serve(_INGEST_HOST, config.hub_port)
     except OSError:

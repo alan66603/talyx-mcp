@@ -128,3 +128,26 @@ def test_hub_port_taken_exits_zero(capsys: pytest.CaptureFixture[str]) -> None:
         cfg = Config(metrics_port=_free_port(), metrics_host="127.0.0.1", hub_port=port)
         assert run_hub(cfg) == 0
     assert f"hub already running on 127.0.0.1:{port}" in capsys.readouterr().err
+
+
+def test_run_hub_passes_otlp_endpoint_to_metrics(monkeypatch: pytest.MonkeyPatch) -> None:
+    import talyx.hub.server as hub_server
+
+    seen: list[dict] = []
+
+    def fake_metrics(*args: object, **kwargs: object) -> Metrics:
+        seen.append(kwargs)
+        return Metrics()  # no OTLP exporter in tests
+
+    monkeypatch.setattr(hub_server, "Metrics", fake_metrics)
+    with socket.socket() as blocker:
+        blocker.bind(("127.0.0.1", 0))
+        blocker.listen()
+        cfg = Config(
+            metrics_port=blocker.getsockname()[1],
+            metrics_host="127.0.0.1",
+            hub_port=_free_port(),
+            otlp_endpoint="http://collector:4318/v1/metrics",
+        )
+        assert run_hub(cfg) == 1  # metrics port taken: exits right after building Metrics
+    assert seen == [{"otlp_endpoint": "http://collector:4318/v1/metrics"}]

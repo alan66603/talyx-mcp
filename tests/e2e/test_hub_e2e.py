@@ -81,7 +81,7 @@ def test_two_wrappers_share_one_metrics_endpoint(tmp_path: Path) -> None:
         "TALYX_METRICS_PORT": str(metrics_port),
         "HOME": str(tmp_path),  # keep ~/.talyx/hub.log out of the real home
     }
-    hubs: list[int] = []
+    hubs: set[int] = set()
     wrappers: list[subprocess.Popen] = []
     try:
         a = spawn_wrapper(env, "alpha")
@@ -89,7 +89,7 @@ def test_two_wrappers_share_one_metrics_endpoint(tmp_path: Path) -> None:
         run_cycle(Client(a.stdin, a.stdout), rounds=0)
         # The first wrapper auto-spawned the hub; find it while it is still our child.
         scrape_until(metrics_port, ['server="alpha"'])
-        hubs.extend(hub_children(a.pid))
+        hubs.update(hub_children(a.pid))
 
         b = spawn_wrapper(env, "beta")
         wrappers.append(b)
@@ -100,10 +100,19 @@ def test_two_wrappers_share_one_metrics_endpoint(tmp_path: Path) -> None:
         assert 'talyx_server_up{server="beta"} 1.0' in body
         assert (tmp_path / ".talyx" / "hub.log").exists()
     finally:
+        # Look the hub up again before any wrapper exits (it is only findable
+        # as a wrapper's child), so it is killed even if the test failed early.
         for w in wrappers:
-            w.stdin.close()
-            w.wait(timeout=TIMEOUT)
-            w.stdout.close()
+            hubs.update(hub_children(w.pid))
+        for w in wrappers:
+            try:
+                w.stdin.close()
+                w.wait(timeout=TIMEOUT)
+            except (OSError, subprocess.TimeoutExpired):
+                w.kill()
+                w.wait()
+            finally:
+                w.stdout.close()
         for pid in hubs:
             kill(pid)
     assert hubs, "no auto-spawned hub found"
