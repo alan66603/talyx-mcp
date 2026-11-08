@@ -58,3 +58,11 @@ def test_stack_config_pins_storage_and_target() -> None:
     assert "talyx-grafana-data" in compose
     assert "mcp-demo" not in compose
     assert "host.docker.internal:9464" in (assets / "prometheus.yml").read_text()
+
+
+def test_stack_ports_bind_localhost_only() -> None:
+    # Grafana runs with anonymous Admin, so nothing may listen on all interfaces.
+    compose = (resources.files("talyx.dashboard") / "assets" / "compose.yaml").read_text()
+    for port in ("3000", "9090", "9093"):
+        assert f'"127.0.0.1:{port}:{port}"' in compose
+        assert f'"{port}:{port}"' not in compose
