@@ -8,6 +8,9 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 
+# One process per container: the wrapper serves /metrics itself, no hub.
+ENV TALYX_HUB=off
+
 # Prometheus /metrics endpoint (default port; override with TALYX_METRICS_PORT).
 EXPOSE 9464
 

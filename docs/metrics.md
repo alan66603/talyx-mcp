@@ -3,7 +3,7 @@
 English | [繁體中文](metrics.zh-TW.md)
 
 Talyx exposes Prometheus metrics on `/metrics` (default port `9464`). It
-records **no tool arguments** and no message bodies — only method/tool names,
+**does not record tool argument contents** or message bodies — only method/tool names,
 outcomes, timings, and cycle structure. The one correlation key it needs (the
 sealed `requestState` token) is **hashed in memory and never stored** in any
 label, log, or trace.
@@ -40,7 +40,7 @@ human/client) or `poll` (state-only — the server asked the client to retry).
 
 | Metric | Type | Labels | Meaning |
 |---|---|---|---|
-| `talyx_server_up` | gauge | — | `1` while the wrapped server subprocess is alive, else `0`. |
+| `talyx_server_up` | gauge | `server` | `1` while the wrapped server subprocess is alive; `0` if it exits by itself while the client is still connected (crash). A normal exit after the client closed removes the series (clean, no alert). |
 | `talyx_inflight_requests_lost_total` | counter | `server` | In-flight requests dropped when the subprocess went down. |
 | `talyx_proxy_overhead_seconds` | histogram | — | Wall-clock time talyx spends observing each forwarded chunk. |
 

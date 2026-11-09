@@ -18,9 +18,10 @@ traffic. It ships with a Grafana dashboard and Alertmanager rules. It is
 
 ```mermaid
 flowchart LR
-    client["MCP client"] <-->|stdio JSON-RPC| talyx["talyx<br/>(proxy + exporter)"]
+    client["MCP client"] <-->|stdio JSON-RPC| talyx["talyx wrapper<br/>(one per server)"]
     talyx <-->|stdio JSON-RPC| server["your MCP server"]
-    talyx -->|/metrics :9464| prom["Prometheus"] --> grafana["Grafana"]
+    talyx -->|events, local TCP :9465| hub["talyx hub"]
+    hub -->|/metrics :9464| prom["Prometheus"] --> grafana["Grafana"]
     prom --> am["Alertmanager"]
 ```
 
@@ -28,15 +29,69 @@ flowchart LR
 
 - [talyx-mcp](#talyx-mcp)
   - [Table of Contents](#table-of-contents)
-  - [Quickstart (the demo)](#quickstart-the-demo)
-  - [Install](#install)
+  - [Quick start](#quick-start)
+    - [Servers talyx cannot wrap](#servers-talyx-cannot-wrap)
+  - [Demo](#demo)
+  - [Install and manual use](#install-and-manual-use)
+  - [The hub](#the-hub)
   - [Metrics](#metrics)
   - [How it works](#how-it-works)
   - [Roadmap](#roadmap)
   - [License](#license)
   - [Author](#author)
 
-## Quickstart (the demo)
+## Quick start
+
+Three commands, for Claude Code users:
+
+```bash
+uv tool install talyx-mcp   # install globally (see note below)
+talyx wrap                  # wrap your existing Claude Code MCP servers
+talyx dashboard up          # Prometheus + Alertmanager + Grafana, one command
+```
+
+Open **http://localhost:3000** (Grafana) or **http://localhost:9090**
+(Prometheus). `talyx wrap` takes effect in **new** Claude Code sessions.
+
+- `talyx wrap --dry-run` shows what would change without touching anything.
+  `talyx unwrap` restores the originals.
+- `wrap` rewrites your own Claude Code MCP servers (user scope plus the current
+  directory's local scope) through `claude mcp remove` / `add-json`. The
+  originals are backed up to `~/.talyx/wrap-backup.json` (mode 0600, directory
+  0700). Note that during `wrap` / `unwrap`, `claude mcp add-json` receives the
+  server spec, including its `env`, as a command-line argument, and those same
+  values already live in `~/.claude.json`; the backup file is not the only place
+  they appear.
+- Install talyx globally (`uv tool install talyx-mcp`). `wrap` warns if `talyx`
+  resolves inside a virtualenv, because the wrapped command must keep working
+  outside it.
+- `talyx dashboard down` stops the stack; data is kept in named Docker volumes
+  across down/up. The stack needs **Docker** and runs as the compose project
+  `talyx-dashboard`; `up` also makes sure the hub is running.
+- The dashboard stack uses the same ports as the demo stack below
+  (9090 / 3000 / 9093, and 9464 for metrics). Stop one before starting the other.
+
+### Servers talyx cannot wrap
+
+These are not in `~/.claude.json`, so `talyx wrap` never sees them and does not
+list them:
+
+- **Plugin-provided servers** (managed by the plugin, not by your config).
+- **claude.ai connectors.**
+
+These are in your config, and `talyx wrap` skips them and says why:
+
+- **Project scope** (`.mcp.json`): wrapping would commit your personal absolute
+  paths into a shared file.
+- **URL (http) servers with headers**: talyx will not move credentials into
+  command-line arguments.
+- **sse servers.**
+
+http servers *without* headers are wrapped through
+`npx -y mcp-remote@0.16.5 <url>`. That is a third-party package; for servers
+that use OAuth, run it once in a terminal first to log in.
+
+## Demo
 
 Runs talyx + a sample MCP server + Prometheus + Alertmanager + Grafana, with
 live traffic, in one command:
@@ -53,7 +108,7 @@ login). You'll see request rate, error rate, p95 latency, and the flagship
 **abandoned cycles** (agents silently stuck waiting on a confirmation) — updating
 live. Prometheus is on `:9090`, Alertmanager on `:9093`.
 
-## Install
+## Install and manual use
 
 Install from PyPI:
 
@@ -80,15 +135,57 @@ the server, and pass the real command after `--`:
 { "command": "talyx", "args": ["--", "npx", "-y", "@modelcontextprotocol/server-everything"] }
 ```
 
-Metrics are then at `http://localhost:9464/metrics`. Configure the port with
-`TALYX_METRICS_PORT` / `TALYX_METRICS_HOST`. To also push metrics over OTLP, set
-`TALYX_OTLP_ENDPOINT` and install the extra: `pip install 'talyx-mcp[otlp]'`
-(Prometheus `/metrics` stays on regardless).
+This `talyx -- <cmd>` form is the underlying mechanism; `talyx wrap` just
+rewrites your config into it for you.
+
+Metrics are then at `http://localhost:9464/metrics`, served by the hub (next
+section). Configure the port with `TALYX_METRICS_PORT` / `TALYX_METRICS_HOST`. To
+also push metrics over OTLP, set `TALYX_OTLP_ENDPOINT` and install the extra:
+`pip install 'talyx-mcp[otlp]'` (Prometheus `/metrics` stays on regardless).
 
 > The flagship cycle metrics need a server that speaks MCP `2026-07-28`
 > (`InputRequiredResult`). Wrapping an older server still gives you the core
 > reliability metrics; to see the cycle panels, try the bundled mock server:
 > `talyx -- python -m talyx.mock.server`.
+
+## The hub
+
+Every `talyx -- <cmd>` wrapper ships its events over local TCP
+(`127.0.0.1:9465`, `TALYX_HUB_PORT`) to **one** long-lived hub that talyx spawns
+automatically (`talyx hub`). The hub serves the single `/metrics` on `:9464` and
+handles `TALYX_OTLP_ENDPOINT`, so many MCP servers (and many Claude Code
+sessions) show up in one place instead of fighting over a port. Events are
+queued and sent as soon as the hub is up; nothing falls back to a local port
+unless you set `TALYX_HUB=off`, which restores the old per-process `/metrics`.
+The hub log is `~/.talyx/hub.log`.
+
+Running the hub:
+
+- **Stop it** with `pkill -f "talyx hub"`. It keeps running after
+  `talyx unwrap` and `talyx dashboard down`, and after `uv tool upgrade`; restart
+  it (stop it, then open a wrapped session or run `talyx dashboard up`) to pick
+  up new code.
+- **Its config** (`TALYX_OTLP_ENDPOINT`, `TALYX_METRICS_HOST` /
+  `TALYX_METRICS_PORT`) comes from the environment of whichever wrapper starts
+  it. The hub gets only `TALYX_*` and a few basics (`PATH`, `HOME`, `USER`,
+  locale, `TMPDIR`) from that environment, not your servers' secrets, and runs
+  from your home directory.
+- **`/metrics` binds `0.0.0.0` by default**, so it is reachable from your
+  network. Set `TALYX_METRICS_HOST=127.0.0.1` to keep it local.
+- **After a reboot** the dashboard containers come back on their own, but the
+  hub starts only with the next wrapped session or `talyx dashboard up`.
+
+The hub receives only event fields (method name, tool name, durations,
+`wait_type`, error codes), never parameters, results, or `requestState`.
+
+`talyx_server_up` distinguishes a clean exit from a crash: if the client closes
+first and the server then exits normally, the series is removed and nothing
+alerts; if the client is still connected and the server exits by itself, it goes
+to `0`. Stopping the wrapper with SIGTERM / SIGINT (as some MCP clients do)
+counts as clean. A crashed server's `0` series is removed after 15 minutes if it
+does not come back, so a server you stopped using does not stay down forever.
+Edge case: if the client closes and the server later crashes on its own, it is
+still reported as clean.
 
 ## Metrics
 
@@ -125,9 +222,10 @@ Plus basic liveness (`talyx_server_up`, `talyx_inflight_requests_lost_total`) an
 above baseline usually signals a broken or confusing prompt, especially around
 high-risk `InputRequiredResult` gates.
 
-**Security:** Talyx records *no tool arguments* and no message bodies — only
-method/tool names, outcomes, and timings. The one correlation key it needs (the
-sealed `requestState` token) is **hashed in memory and never stored** See [docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
+**Security:** Talyx does not record tool argument contents or message bodies; it
+only reads method and tool names, outcomes, and timings. The hub receives only
+those event fields, never parameters, results, or `requestState`. The one correlation key it needs (the
+sealed `requestState` token) is **hashed in memory and never stored**. See [docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
 
 **Overhead:** talyx's own per-chunk processing is sub-millisecond
 (`talyx_proxy_overhead_seconds`), so it doesn't meaningfully slow the server down.

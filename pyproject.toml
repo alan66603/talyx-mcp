@@ -28,6 +28,10 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/talyx"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"alerts/mcp-rules.yaml" = "talyx/dashboard/assets/rules/mcp-rules.yaml"
+"dashboards/mcp-overview.json" = "talyx/dashboard/assets/dashboards/mcp-overview.json"
+
 [dependency-groups]
 dev = [
     "pytest>=8.0",
@@ -45,3 +49,4 @@ select = ["E", "F", "I", "UP", "B"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

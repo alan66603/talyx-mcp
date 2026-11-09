@@ -2,7 +2,7 @@
 
 [English](metrics.md) | 繁體中文
 
-Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記錄任何 tool 參數**、
+Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記錄 tool 參數內容**、
 不記錄訊息內容——只取 method/tool 名稱、結果、時間與循環結構。它唯一需要的關聯鍵
 （密封的 `requestState` token）**在記憶體內雜湊，絕不寫入任何 label、log 或 trace**。
 
@@ -37,7 +37,7 @@ Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記
 
 | 指標 | 型別 | Labels | 意義 |
 |---|---|---|---|
-| `talyx_server_up` | gauge | — | 被包住的 server 子行程活著時為 `1`，否則 `0`。 |
+| `talyx_server_up` | gauge | `server` | 被包住的 server 子行程活著時為 `1`；client 仍連線時 server 自行結束（崩潰）則為 `0`。client 先關閉後的正常結束會移除該序列（視為正常，不告警）。 |
 | `talyx_inflight_requests_lost_total` | counter | `server` | 子行程掛掉時，還在進行中而遺失的請求數。 |
 | `talyx_proxy_overhead_seconds` | histogram | — | talyx 觀測每個轉發 chunk 所花的實際時間。 |
 

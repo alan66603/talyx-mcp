@@ -13,6 +13,8 @@ COPY pyproject.toml README.md ./
 COPY src ./src
 RUN python -m venv /venv && /venv/bin/pip install --no-cache-dir .
 ENV PATH="/venv/bin:$PATH"
+# One process serves /metrics (the wrapper itself), no hub in the container.
+ENV TALYX_HUB=off
 
 COPY deploy/compose/driver.py ./driver.py
 

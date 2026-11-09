@@ -150,7 +150,7 @@ class _LineSplitter:
         return lines
 
 
-class SessionTracker:
+class TrafficObserver:
     """Observes proxied JSON-RPC traffic and pairs requests with responses.
 
     Purely observational: it never modifies traffic, and a line it cannot

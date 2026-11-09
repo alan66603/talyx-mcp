@@ -14,7 +14,7 @@ from talyx.proxy.jsonrpc import (
     InputWaitCompleted,
     RequestCompleted,
     RequestStateRejected,
-    SessionTracker,
+    TrafficObserver,
 )
 
 
@@ -29,9 +29,9 @@ class FakeClock:
         self.now += seconds
 
 
-def make_tracker(abandon: float = 300.0) -> tuple[SessionTracker, FakeClock]:
+def make_tracker(abandon: float = 300.0) -> tuple[TrafficObserver, FakeClock]:
     clock = FakeClock()
-    return SessionTracker(abandon_timeout_seconds=abandon, clock=clock), clock
+    return TrafficObserver(abandon_timeout_seconds=abandon, clock=clock), clock
 
 
 def line(msg: dict) -> bytes:
@@ -162,7 +162,7 @@ def test_followup_without_request_state_is_a_plain_request() -> None:
     assert only(followup, InputWaitCompleted) == []
 
 
-def drive_all(metrics: Metrics, tracker: SessionTracker, chunks: list) -> None:
+def drive_all(metrics: Metrics, tracker: TrafficObserver, chunks: list) -> None:
     for feed, data in chunks:
         for event in feed(data):
             apply_event(metrics, event)

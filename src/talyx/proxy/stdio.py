@@ -28,7 +28,9 @@ class StdioProxy:
         on_server_bytes: Callable[[bytes], object] | None = None,
         # Called when the child subprocess comes up / goes down; failures swallowed.
         on_child_up: Callable[[], object] | None = None,
-        on_child_down: Callable[[], object] | None = None,
+        # Receives `crashed`: True if the child exited before the client closed
+        # stdin and without a forwarded SIGINT/SIGTERM asking it to stop.
+        on_child_down: Callable[[bool], object] | None = None,
     ) -> None:
         self._command = command
         self._proc: asyncio.subprocess.Process | None = None
@@ -36,6 +38,10 @@ class StdioProxy:
         self._on_server_bytes = on_server_bytes
         self._on_child_up = on_child_up
         self._on_child_down = on_child_down
+        # Set only by a real EOF read on our stdin, never by task cancellation.
+        self._client_closed = False
+        # Set when we relay SIGINT/SIGTERM: the parent asked for the shutdown.
+        self._stop_requested = False
 
     async def run(self) -> int:
         try:
@@ -58,7 +64,8 @@ class StdioProxy:
         finally:
             for sig in _FORWARDED_SIGNALS:
                 loop.remove_signal_handler(sig)
-            self._notify(self._on_child_down)
+            crashed = not (self._client_closed or self._stop_requested)
+            self._notify(self._on_child_down, crashed)
 
     async def _pump_until_exit(self) -> int:
         assert self._proc is not None
@@ -127,6 +134,7 @@ class StdioProxy:
             while True:
                 chunk = await reader.read(_CHUNK_SIZE)
                 if not chunk:
+                    self._client_closed = True
                     break
                 writer.write(chunk)
                 await writer.drain()
@@ -172,16 +180,17 @@ class StdioProxy:
             print(f"talyx: observer error ignored: {exc!r}", file=sys.stderr)
 
     @staticmethod
-    def _notify(callback: Callable[[], object] | None) -> None:
+    def _notify(callback: Callable[..., object] | None, *args: object) -> None:
         """Fire a lifecycle callback; its failures must never break the proxy."""
         if callback is None:
             return
         try:
-            callback()
+            callback(*args)
         except Exception as exc:  # noqa: BLE001 - lifecycle hooks are best-effort
             print(f"talyx: lifecycle callback error ignored: {exc!r}", file=sys.stderr)
 
     def _forward_signal(self, sig: signal.Signals) -> None:
+        self._stop_requested = True
         if self._proc is not None and self._proc.returncode is None:
             with contextlib.suppress(ProcessLookupError):
                 self._proc.send_signal(sig)

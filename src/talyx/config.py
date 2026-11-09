@@ -13,6 +13,9 @@ DEFAULT_METRICS_PORT = 9464
 # abandonment. Tune against the observed input_wait distribution.
 DEFAULT_ABANDONED_TIMEOUT_SECONDS = 300.0
 
+# Local TCP port wrappers use to stream events to the hub.
+DEFAULT_HUB_PORT = 9465
+
 
 @dataclass(frozen=True)
 class Config:
@@ -23,6 +26,9 @@ class Config:
     abandoned_timeout_seconds: float = DEFAULT_ABANDONED_TIMEOUT_SECONDS
     # Optional OTLP metrics endpoint. None → Prometheus /metrics only (default).
     otlp_endpoint: str | None = None
+    hub_port: int = DEFAULT_HUB_PORT
+    # False (TALYX_HUB=off) → wrappers serve their own /metrics, no hub.
+    hub_enabled: bool = True
 
     @classmethod
     def from_env(cls) -> Config:
@@ -36,4 +42,6 @@ class Config:
                 )
             ),
             otlp_endpoint=os.environ.get("TALYX_OTLP_ENDPOINT") or None,
+            hub_port=int(os.environ.get("TALYX_HUB_PORT", str(DEFAULT_HUB_PORT))),
+            hub_enabled=os.environ.get("TALYX_HUB", "") != "off",
         )
