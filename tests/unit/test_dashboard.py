@@ -124,3 +124,20 @@ def test_error_rate_panel_has_traffic_floor() -> None:
     dash = json.loads((_REPO / "dashboards/mcp-overview.json").read_text())
     panel = next(p for p in dash["panels"] if p["title"] == "Error Rate")
     assert "sum(increase(talyx_requests_total[5m])) >= 20" in panel["targets"][0]["expr"]
+
+
+def test_dockerfiles_copy_force_included_dirs() -> None:
+    # pyproject force-includes alerts/ and dashboards/ into the wheel; an image
+    # that pip-installs the repo without them fails at build time.
+    for dockerfile in ("Dockerfile", "deploy/docker/Dockerfile", "deploy/compose/Dockerfile.demo"):
+        text = (_REPO / dockerfile).read_text()
+        assert "COPY alerts ./alerts" in text, dockerfile
+        assert "COPY dashboards ./dashboards" in text, dockerfile
+
+
+def test_glama_json_names_the_maintainer() -> None:
+    import json
+
+    glama = json.loads((_REPO / "glama.json").read_text())
+    assert glama["$schema"] == "https://glama.ai/mcp/schemas/server.json"
+    assert glama["maintainers"] == ["alan66603"]

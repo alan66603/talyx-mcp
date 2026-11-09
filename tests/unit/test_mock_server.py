@@ -70,3 +70,34 @@ def test_reject_kind_fails_the_final_followup() -> None:
 
 def test_non_tool_call_is_ignored() -> None:
     assert handle({"jsonrpc": "2.0", "method": "notifications/ping"}) is None
+
+
+def request(method: str, params: dict | None = None) -> dict:
+    return {"jsonrpc": "2.0", "id": 7, "method": method, "params": params or {}}
+
+
+def test_initialize_echoes_protocol_version_and_offers_tools() -> None:
+    resp = handle(request("initialize", {"protocolVersion": "2025-06-18"}))
+    assert resp["id"] == 7
+    assert resp["result"]["protocolVersion"] == "2025-06-18"
+    assert "tools" in resp["result"]["capabilities"]
+    assert resp["result"]["serverInfo"]["name"] == "talyx-mock"
+
+
+def test_tools_list_describes_the_cycle_tool() -> None:
+    (tool,) = handle(request("tools/list"))["result"]["tools"]
+    assert tool["name"] == "cycle"
+    props = tool["inputSchema"]["properties"]
+    assert props["kind"]["enum"] == ["input", "poll", "reject"]
+    assert props["rounds"]["type"] == "integer"
+
+
+def test_unknown_request_gets_method_not_found() -> None:
+    # Clients probe (e.g. server/discover) and wait for an answer; silence would hang them.
+    resp = handle(request("server/discover"))
+    assert resp["id"] == 7
+    assert resp["error"]["code"] == -32601
+
+
+def test_notifications_get_no_reply() -> None:
+    assert handle({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None

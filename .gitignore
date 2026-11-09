@@ -1,8 +1,5 @@
-# Claude Code local settings
 .claude
 /CLAUDE.md
-
-# Python
 __pycache__/
 *.pyc
 .venv/
@@ -13,6 +10,4 @@ build/
 dist/
 
 docs/migration-2026-07-28.md
-
-# graphify output (contains absolute local paths)
 graphify-out/
