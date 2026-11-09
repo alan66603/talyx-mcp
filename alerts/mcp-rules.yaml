@@ -26,10 +26,15 @@ groups:
           description: "Prometheus cannot scrape talyx on {{ $labels.instance }}."
 
       # More than 10% of requests are failing over the last 5 minutes.
+      # Needs >= 20 requests in the window: as traffic dies down the window
+      # holds only a handful of requests, and 4 errors out of 5 is 80%.
       - alert: MCPHighErrorRate
         expr: >
-          sum(rate(talyx_errors_total[5m]))
-            / sum(rate(talyx_requests_total[5m])) > 0.1
+          (
+            sum(rate(talyx_errors_total[5m]))
+              / sum(rate(talyx_requests_total[5m])) > 0.1
+          )
+          and sum(increase(talyx_requests_total[5m])) >= 20
         for: 2m
         labels:
           severity: warning
@@ -39,19 +44,23 @@ groups:
             {{ $value | humanizePercentage }} of requests are failing over the
             last 5m.
 
-      # p95 request latency above 2s over the last 5 minutes.
+      # p95 request latency above 2s over the last 5 minutes, per method.
+      # Same >= 20 floor: with one or two samples p95 is just a bucket bound.
       - alert: MCPHighLatencyP95
         expr: >
-          histogram_quantile(
-            0.95,
-            sum(rate(talyx_request_duration_seconds_bucket[5m])) by (le, method)
-          ) > 2
+          (
+            histogram_quantile(
+              0.95,
+              sum(rate(talyx_request_duration_seconds_bucket[5m])) by (le, method)
+            ) > 2
+          )
+          and sum(increase(talyx_request_duration_seconds_count[5m])) by (method) >= 20
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "MCP request p95 latency high (>2s)"
-          description: "p95 latency for {{ $labels.method }} is {{ $value }}s over 5m."
+          description: "p95 latency for {{ $labels.method }} is {{ $value | humanizeDuration }} over 5m."
 
       # --- Flagship: Multi Round-Trip cycle health (spec §2.3) ---
 

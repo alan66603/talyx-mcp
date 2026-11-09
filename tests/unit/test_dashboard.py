@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import shutil
 import subprocess
 from importlib import resources
 from pathlib import Path
+
+import pytest
 
 from talyx.dashboard import PROJECT, down, up
 
@@ -83,3 +86,41 @@ def test_server_up_panel_and_alert_are_per_server() -> None:
     down = rules.split("alert: MCPServerDown", 1)[1].split("- alert:", 1)[0]
     assert "$labels.server" in down
     assert "$labels.instance" not in down
+
+
+_PROM_IMAGE = "prom/prometheus:v2.54.1"
+
+
+def _promtool() -> list[str] | None:
+    if shutil.which("promtool"):
+        return ["promtool"]
+    if not shutil.which("docker"):
+        return None
+    inspect = subprocess.run(["docker", "image", "inspect", _PROM_IMAGE], capture_output=True)
+    if inspect.returncode != 0:
+        return None
+    alerts = str(_REPO / "alerts")
+    mount = f"{alerts}:{alerts}:ro"
+    return ["docker", "run", "--rm", "--entrypoint", "promtool", "-v", mount, _PROM_IMAGE]
+
+
+def test_alert_rules_ignore_low_traffic() -> None:
+    # Behaviour lives in alerts/mcp-rules.test.yaml: a trickle of failing or slow
+    # requests stays silent, real traffic with the same ratios fires.
+    cmd = _promtool()
+    if cmd is None:
+        pytest.skip("needs promtool or the prom/prometheus image")
+    proc = subprocess.run(
+        [*cmd, "test", "rules", str(_REPO / "alerts/mcp-rules.test.yaml")],
+        capture_output=True,
+        text=True,
+    )
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+
+def test_error_rate_panel_has_traffic_floor() -> None:
+    import json
+
+    dash = json.loads((_REPO / "dashboards/mcp-overview.json").read_text())
+    panel = next(p for p in dash["panels"] if p["title"] == "Error Rate")
+    assert "sum(increase(talyx_requests_total[5m])) >= 20" in panel["targets"][0]["expr"]

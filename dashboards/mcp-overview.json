@@ -53,7 +53,7 @@
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
       "targets": [
-        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "sum(rate(talyx_errors_total[5m])) / sum(rate(talyx_requests_total[5m]))" }
+        { "refId": "A", "datasource": { "type": "prometheus", "uid": "prometheus" }, "expr": "(sum(rate(talyx_errors_total[5m])) / sum(rate(talyx_requests_total[5m]))) and sum(increase(talyx_requests_total[5m])) >= 20" }
       ],
       "options": { "reduceOptions": { "calcs": ["lastNotNull"] }, "colorMode": "background", "graphMode": "none" },
       "fieldConfig": {

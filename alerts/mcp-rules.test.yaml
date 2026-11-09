@@ -1,0 +1,65 @@
+# promtool unit tests for mcp-rules.yaml:  promtool test rules alerts/mcp-rules.test.yaml
+rule_files:
+  - mcp-rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # Trickle of traffic, every request failing: below the 20-request floor, no alert.
+  - interval: 1m
+    input_series:
+      - series: 'talyx_requests_total{method="tools/call",server="s",status="error"}'
+        values: "0+1x20"
+      - series: 'talyx_errors_total{method="tools/call",server="s",error_code="app_error"}'
+        values: "0+1x20"
+      - series: 'talyx_request_duration_seconds_bucket{method="tools/call",server="s",le="1"}'
+        values: "0x20"
+      - series: 'talyx_request_duration_seconds_bucket{method="tools/call",server="s",le="5"}'
+        values: "0+1x20"
+      - series: 'talyx_request_duration_seconds_bucket{method="tools/call",server="s",le="+Inf"}'
+        values: "0+1x20"
+      - series: 'talyx_request_duration_seconds_count{method="tools/call",server="s"}'
+        values: "0+1x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: MCPHighErrorRate
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: MCPHighLatencyP95
+        exp_alerts: []
+
+  # Real traffic (10/min), 20% failing and every request slow: both fire.
+  - interval: 1m
+    input_series:
+      - series: 'talyx_requests_total{method="tools/call",server="s",status="ok"}'
+        values: "0+8x20"
+      - series: 'talyx_requests_total{method="tools/call",server="s",status="error"}'
+        values: "0+2x20"
+      - series: 'talyx_errors_total{method="tools/call",server="s",error_code="app_error"}'
+        values: "0+2x20"
+      - series: 'talyx_request_duration_seconds_bucket{method="tools/call",server="s",le="1"}'
+        values: "0x20"
+      - series: 'talyx_request_duration_seconds_bucket{method="tools/call",server="s",le="5"}'
+        values: "0+10x20"
+      - series: 'talyx_request_duration_seconds_bucket{method="tools/call",server="s",le="+Inf"}'
+        values: "0+10x20"
+      - series: 'talyx_request_duration_seconds_count{method="tools/call",server="s"}'
+        values: "0+10x20"
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: MCPHighErrorRate
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: "High MCP error rate (>10%)"
+              description: "20% of requests are failing over the last 5m.\n"
+      - eval_time: 15m
+        alertname: MCPHighLatencyP95
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              method: tools/call
+            exp_annotations:
+              summary: "MCP request p95 latency high (>2s)"
+              description: "p95 latency for tools/call is 4.8s over 5m."
