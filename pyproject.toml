@@ -1,6 +1,6 @@
 [project]
 name = "talyx-mcp"
-version = "0.0.1"
+version = "0.1.0"
 description = "Prometheus exporter and alerting proxy for MCP servers"
 readme = "README.md"
 license = "Apache-2.0"
