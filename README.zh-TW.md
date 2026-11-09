@@ -35,6 +35,7 @@ flowchart LR
   - [安裝與手動使用](#安裝與手動使用)
   - [Hub](#hub)
   - [指標](#指標)
+  - [告警](#告警)
   - [運作方式](#運作方式)
   - [Roadmap](#roadmap)
   - [License](#license)
@@ -66,6 +67,7 @@ talyx dashboard up          # Prometheus + Alertmanager + Grafana，一行啟動
   確保 hub 在跑。
 - dashboard 與下方 demo 堆疊使用相同埠號（9090 / 3000 / 9093，指標用 9464）。
   一次只能開其中一組，另一組要先停掉。
+- talyx 支援 **macOS 與 Linux**，目前還不支援 Windows。
 
 ### talyx 包不了的 server
 
@@ -132,7 +134,9 @@ pip install .
 
 > 招牌的循環指標需要一個講 MCP `2026-07-28`（會回 `InputRequiredResult`）的 server。
 > 包在舊 server 上仍能拿到核心可靠性指標；想看循環面板，可以用內附的 mock server：
-> `talyx -- python -m talyx.mock.server`。
+> `talyx -- python -m talyx.mock.server`。也可以直接加進 Claude Code：
+> `claude mcp add talyx-mock -- talyx -- python -m talyx.mock.server`，再請 Claude 呼叫它的
+> `cycle` 工具（`kind` 可選 `input`、`poll` 或 `reject`）。
 
 ## Hub
 
@@ -205,6 +209,29 @@ server 才自行崩潰，仍會被視為正常結束。
 
 **額外開銷：** talyx 自身每個 chunk 的處理是次毫秒等級（`talyx_proxy_overhead_seconds`），
 所以不會實質拖慢 server。
+
+## 告警
+
+`talyx dashboard up`（以及 demo）會把下列規則載入 Prometheus，觸發後交給 Alertmanager。規則檔在
+[alerts/mcp-rules.yaml](https://github.com/alan66603/talyx-mcp/blob/main/alerts/mcp-rules.yaml)，
+也可以直接接到你自己的 Prometheus。
+
+| 告警 | 觸發條件 | 持續 |
+|---|---|---|
+| `MCPServerDown` | 被包的 server 崩潰（`talyx_server_up == 0`） | 1m |
+| `MCPExporterDown` | Prometheus 抓不到 talyx | 1m |
+| `MCPHighErrorRate` | 5 分鐘內超過 10% 的請求失敗 | 2m |
+| `MCPHighLatencyP95` | 某個 method 5 分鐘內的 p95 延遲超過 2 秒 | 5m |
+| `MCPAbandonedCyclesSpike` | 被放棄的循環每秒超過 0.05 次 | 5m |
+| `MCPRunawayCycles` | 有循環超過 10 次往返 | 5m |
+| `MCPRequestStateRejectedSpike` | `requestState` 被拒每秒超過 0.05 次 | 5m |
+| `MCPCycleServerSideSlow` | 每個循環的 server 端平均時間（循環時間扣掉等使用者的時間）超過 2 秒 | 5m |
+
+- **流量少不會亂叫。** 錯誤率與延遲告警要 5 分鐘內至少有 20 個請求才會評估（延遲告警以
+  method 分開計）。否則流量快停時，最後幾筆失敗就可能被算成 80%。
+- **使用者慢也不會叫醒你。** `MCPCycleServerSideSlow` 會把 `input_wait` 從循環時間扣掉，
+  使用者花幾分鐘確認不會被當成 server 慢。
+- 2 秒的延遲門檻是全域單一值；瀏覽器自動化這類換頁本來就比較久的 server 可能會觸發。
 
 ## 運作方式
 

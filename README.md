@@ -35,6 +35,7 @@ flowchart LR
   - [Install and manual use](#install-and-manual-use)
   - [The hub](#the-hub)
   - [Metrics](#metrics)
+  - [Alerts](#alerts)
   - [How it works](#how-it-works)
   - [Roadmap](#roadmap)
   - [License](#license)
@@ -70,6 +71,7 @@ Open **http://localhost:3000** (Grafana) or **http://localhost:9090**
   `talyx-dashboard`; `up` also makes sure the hub is running.
 - The dashboard stack uses the same ports as the demo stack below
   (9090 / 3000 / 9093, and 9464 for metrics). Stop one before starting the other.
+- talyx runs on **macOS and Linux**. Windows is not supported yet.
 
 ### Servers talyx cannot wrap
 
@@ -146,7 +148,9 @@ also push metrics over OTLP, set `TALYX_OTLP_ENDPOINT` and install the extra:
 > The flagship cycle metrics need a server that speaks MCP `2026-07-28`
 > (`InputRequiredResult`). Wrapping an older server still gives you the core
 > reliability metrics; to see the cycle panels, try the bundled mock server:
-> `talyx -- python -m talyx.mock.server`.
+> `talyx -- python -m talyx.mock.server`. It also works inside Claude Code:
+> `claude mcp add talyx-mock -- talyx -- python -m talyx.mock.server`, then ask
+> Claude to call its `cycle` tool (`kind`: `input`, `poll` or `reject`).
 
 ## The hub
 
@@ -229,6 +233,33 @@ sealed `requestState` token) is **hashed in memory and never stored**. See [docs
 
 **Overhead:** talyx's own per-chunk processing is sub-millisecond
 (`talyx_proxy_overhead_seconds`), so it doesn't meaningfully slow the server down.
+
+## Alerts
+
+`talyx dashboard up` (and the demo) load these rules into Prometheus,
+which hands firing alerts to Alertmanager. They live in
+[alerts/mcp-rules.yaml](https://github.com/alan66603/talyx-mcp/blob/main/alerts/mcp-rules.yaml),
+so you can also point your own Prometheus at them.
+
+| Alert | Fires when | For |
+|---|---|---|
+| `MCPServerDown` | a wrapped server crashed (`talyx_server_up == 0`) | 1m |
+| `MCPExporterDown` | Prometheus can't scrape talyx | 1m |
+| `MCPHighErrorRate` | more than 10% of requests fail over 5m | 2m |
+| `MCPHighLatencyP95` | a method's p95 latency is above 2s over 5m | 5m |
+| `MCPAbandonedCyclesSpike` | cycles are abandoned faster than 0.05/s | 5m |
+| `MCPRunawayCycles` | any cycle takes more than 10 round-trips | 5m |
+| `MCPRequestStateRejectedSpike` | `requestState` rejections exceed 0.05/s | 5m |
+| `MCPCycleServerSideSlow` | average server-side time per cycle (cycle time minus time waiting on the user) is above 2s | 5m |
+
+- **Low traffic doesn't page you.** The error-rate and latency alerts only
+  evaluate once there are at least 20 requests in the 5-minute window (per
+  method, for latency). Otherwise a few late failures can read as 80%.
+- **Slow users don't page you either.** `MCPCycleServerSideSlow` subtracts
+  `input_wait` from the cycle time, so a person taking minutes to confirm
+  doesn't count as server slowness.
+- The 2s latency threshold is a single global value; browser-automation servers
+  whose page loads routinely take longer may trip it.
 
 ## How it works
 
