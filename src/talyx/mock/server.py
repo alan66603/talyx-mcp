@@ -29,6 +29,11 @@ All cycle state rides in the requestState token, so the server keeps nothing
 between requests — the 2026-07-28 stateless model in miniature. To trigger an
 *abandoned* cycle the driver simply never sends the follow-up; the server holds
 no state, so there is nothing to clean up on its side.
+
+It also answers `initialize`, `tools/list` and `ping`, so real clients (Claude
+Code, directory crawlers such as Glama's) can connect. Any other request gets
+-32601 rather than silence — clients probe methods like `server/discover` and
+would otherwise wait forever. Notifications get no reply.
 """
 
 from __future__ import annotations
@@ -38,6 +43,53 @@ import secrets
 import sys
 
 _INPUT_REQUEST = {"prompt": "Confirm the high-risk action?"}
+_DEFAULT_PROTOCOL = "2025-06-18"
+
+_CYCLE_TOOL = {
+    "name": "cycle",
+    "description": (
+        "Run a Multi Round-Trip cycle: `rounds` InputRequiredResult legs, then a "
+        "terminal result. kind=input waits on the user, poll is state-only, "
+        "reject fails the last follow-up with invalid_request_state."
+    ),
+    "inputSchema": {
+        "type": "object",
+        "properties": {
+            "kind": {"type": "string", "enum": ["input", "poll", "reject"]},
+            "rounds": {"type": "integer", "minimum": 0},
+        },
+    },
+}
+
+
+def _reply(msg: dict, result: dict) -> dict:
+    return {"jsonrpc": "2.0", "id": msg.get("id"), "result": result}
+
+
+def _handshake(msg: dict) -> dict | None:
+    """Everything that isn't the cycle tool itself."""
+    if "id" not in msg:
+        return None  # notification
+    method = msg.get("method")
+    if method == "initialize":
+        requested = (msg.get("params") or {}).get("protocolVersion")
+        return _reply(
+            msg,
+            {
+                "protocolVersion": requested or _DEFAULT_PROTOCOL,
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "talyx-mock", "version": "1"},
+            },
+        )
+    if method == "tools/list":
+        return _reply(msg, {"tools": [_CYCLE_TOOL]})
+    if method == "ping":
+        return _reply(msg, {})
+    return {
+        "jsonrpc": "2.0",
+        "id": msg.get("id"),
+        "error": {"code": -32601, "message": f"Method not found: {method}"},
+    }
 
 
 def _remaining(state: str) -> tuple[str, int]:
@@ -61,7 +113,7 @@ def _mint(kind: str, remaining: int) -> str:
 def handle(msg: dict) -> dict | None:
     """Map one JSON-RPC request to its response, or None to stay silent."""
     if msg.get("method") != "tools/call":
-        return None  # notifications and other methods are not part of the mock
+        return _handshake(msg)
     params = msg.get("params") or {}
     state = params.get("requestState")
     if isinstance(state, str) and ":" in state:
