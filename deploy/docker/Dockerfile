@@ -6,6 +6,9 @@ WORKDIR /app
 
 COPY pyproject.toml README.md ./
 COPY src ./src
+# pyproject force-includes these into the wheel for `talyx dashboard up`.
+COPY alerts ./alerts
+COPY dashboards ./dashboards
 RUN pip install --no-cache-dir .
 
 # One process per container: the wrapper serves /metrics itself, no hub.
