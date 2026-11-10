@@ -6,16 +6,19 @@
   </picture>
 </p>
 
-# talyx-mcp
-
-English | [繁體中文](https://github.com/alan66603/talyx-mcp/blob/main/README.zh-TW.md)
+ <center>
+  
+ English | [繁體中文](https://github.com/alan66603/talyx-mcp/blob/main/README.zh-TW.md)
 
 [![PyPI](https://img.shields.io/pypi/v/talyx-mcp.svg)](https://pypi.org/project/talyx-mcp/)
-[![GitHub](https://img.shields.io/badge/GitHub-alan66603%2Ftalyx--mcp-181717?logo=github)](https://github.com/alan66603/talyx-mcp)
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![MCP Spec](https://img.shields.io/badge/MCP-2026--07--28-green.svg)](https://modelcontextprotocol.io)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+ </center>
+
+
 
 **Prometheus exporter and alerting for MCP servers.** When your MCP server breaks, your users just see a broken agent—you see exactly which server failed, how slow it got, and when. Wrap any stdio server, **zero code changes**.
 
@@ -35,20 +38,19 @@ flowchart LR
 
 ## Table of Contents
 
-- [talyx-mcp](#talyx-mcp)
-  - [Table of Contents](#table-of-contents)
-  - [Quick start](#quick-start)
-    - [Servers talyx cannot wrap](#servers-talyx-cannot-wrap)
-  - [Demo](#demo)
-  - [Install and manual use](#install-and-manual-use)
-    - [Behind a gateway](#behind-a-gateway)
-  - [The hub](#the-hub)
-  - [Metrics](#metrics)
-  - [Alerts](#alerts)
-  - [How it works](#how-it-works)
-  - [Roadmap](#roadmap)
-  - [License](#license)
-  - [Author](#author)
+- [Table of Contents](#table-of-contents)
+- [Quick start](#quick-start)
+  - [Servers talyx cannot wrap](#servers-talyx-cannot-wrap)
+- [Demo](#demo)
+- [Install and manual use](#install-and-manual-use)
+  - [Behind a gateway](#behind-a-gateway)
+- [The hub](#the-hub)
+- [Metrics](#metrics)
+- [Alerts](#alerts)
+- [How it works](#how-it-works)
+- [Roadmap](#roadmap)
+- [License](#license)
+- [Author](#author)
 
 ## Quick start
 
