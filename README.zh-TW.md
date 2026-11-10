@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/logo-light.svg">
+    <img alt="talyx" src="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/logo-light.svg" width="560">
+  </picture>
+</p>
+
 # talyx-mcp
 
 [English](https://github.com/alan66603/talyx-mcp/blob/main/README.md) | 繁體中文
@@ -33,6 +41,7 @@ flowchart LR
     - [talyx 包不了的 server](#talyx-包不了的-server)
   - [Demo](#demo)
   - [安裝與手動使用](#安裝與手動使用)
+    - [搭配 gateway 使用](#搭配-gateway-使用)
   - [Hub](#hub)
   - [指標](#指標)
   - [告警](#告警)
@@ -137,6 +146,24 @@ pip install .
 > `talyx -- python -m talyx.mock.server`。也可以直接加進 Claude Code：
 > `claude mcp add talyx-mock -- talyx -- python -m talyx.mock.server`，再請 Claude 呼叫它的
 > `cycle` 工具（`kind` 可選 `input`、`poll` 或 `reject`）。
+
+### 搭配 gateway 使用
+
+talyx 不是 gateway，不做路由、認證或 tool 過濾，但可以和 gateway 一起用：只要 gateway 是用一行指令
+啟動 stdio server，就在那行指令前面加上 `talyx --`。以 IBM 的
+[ContextForge](https://github.com/IBM/mcp-context-forge) 為例，它用 `mcpgateway.translate` 把 stdio
+server 轉成 HTTP：
+
+```bash
+# 改之前
+python3 -m mcpgateway.translate --stdio "uvx mcp-server-git" --expose-sse --port 9000
+
+# 改之後：gateway 負責路由，talyx 觀測背後的 server
+python3 -m mcpgateway.translate --stdio "talyx -- uvx mcp-server-git" --expose-sse --port 9000
+```
+
+每個被包住的 server 都會回報給同一台機器上的 hub，所以一個 `/metrics` 就涵蓋 gateway 背後的所有
+server。如果 gateway 把每個 server 放在各自的容器裡跑，請設 `TALYX_HUB=off`，改成分別抓各容器的埠。
 
 ## Hub
 

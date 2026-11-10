@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/logo-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/logo-light.svg">
+    <img alt="talyx" src="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/logo-light.svg" width="560">
+  </picture>
+</p>
+
 # talyx-mcp
 
 English | [繁體中文](https://github.com/alan66603/talyx-mcp/blob/main/README.zh-TW.md)
@@ -33,6 +41,7 @@ flowchart LR
     - [Servers talyx cannot wrap](#servers-talyx-cannot-wrap)
   - [Demo](#demo)
   - [Install and manual use](#install-and-manual-use)
+    - [Behind a gateway](#behind-a-gateway)
   - [The hub](#the-hub)
   - [Metrics](#metrics)
   - [Alerts](#alerts)
@@ -151,6 +160,26 @@ also push metrics over OTLP, set `TALYX_OTLP_ENDPOINT` and install the extra:
 > `talyx -- python -m talyx.mock.server`. It also works inside Claude Code:
 > `claude mcp add talyx-mock -- talyx -- python -m talyx.mock.server`, then ask
 > Claude to call its `cycle` tool (`kind`: `input`, `poll` or `reject`).
+
+### Behind a gateway
+
+talyx is not a gateway and doesn't route, authenticate or filter tools. It
+works alongside one: wherever a gateway launches a stdio server from a
+command, put `talyx --` in front of that command. For example, with IBM's
+[ContextForge](https://github.com/IBM/mcp-context-forge), which exposes a stdio
+server over HTTP through `mcpgateway.translate`:
+
+```bash
+# before
+python3 -m mcpgateway.translate --stdio "uvx mcp-server-git" --expose-sse --port 9000
+
+# after: the gateway routes, talyx observes the server behind it
+python3 -m mcpgateway.translate --stdio "talyx -- uvx mcp-server-git" --expose-sse --port 9000
+```
+
+Each wrapped server reports to the hub on the same machine, so `/metrics`
+covers every server behind the gateway. If the gateway runs servers in their
+own containers, set `TALYX_HUB=off` and scrape each container's port instead.
 
 ## The hub
 
