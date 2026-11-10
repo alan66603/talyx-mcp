@@ -6,19 +6,17 @@
   </picture>
 </p>
 
- <center>
-  
- English | [繁體中文](https://github.com/alan66603/talyx-mcp/blob/main/README.zh-TW.md)
+<p align="center">
+  English | <a href="https://github.com/alan66603/talyx-mcp/blob/main/README.zh-TW.md">繁體中文</a>
+</p>
 
-[![PyPI](https://img.shields.io/pypi/v/talyx-mcp.svg)](https://pypi.org/project/talyx-mcp/)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![MCP Spec](https://img.shields.io/badge/MCP-2026--07--28-green.svg)](https://modelcontextprotocol.io)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-
- </center>
-
-
+<p align="center">
+  <a href="https://pypi.org/project/talyx-mcp/"><img src="https://img.shields.io/pypi/v/talyx-mcp.svg" alt="PyPI"></a>
+  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/License-Apache_2.0-blue.svg" alt="License: Apache 2.0"></a>
+  <a href="https://www.python.org/downloads/"><img src="https://img.shields.io/badge/python-3.11+-blue.svg" alt="Python"></a>
+  <a href="https://modelcontextprotocol.io"><img src="https://img.shields.io/badge/MCP-2026--07--28-green.svg" alt="MCP Spec"></a>
+  <a href="https://github.com/astral-sh/ruff"><img src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json" alt="Ruff"></a>
+</p>
 
 **Prometheus exporter and alerting for MCP servers.** When your MCP server breaks, your users just see a broken agent—you see exactly which server failed, how slow it got, and when. Wrap any stdio server, **zero code changes**.
 
