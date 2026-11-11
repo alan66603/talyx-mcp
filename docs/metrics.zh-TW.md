@@ -14,6 +14,15 @@ Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記
 | `talyx_request_duration_seconds` | histogram | `method`、`server` | 往返延遲，從請求到終端回應。 |
 | `talyx_errors_total` | counter | `method`、`server`、`error_code` | 失敗請求數，依 JSON-RPC error code 分（tool 層 `isError` 記為 `app_error`）。 |
 
+<p align="center">
+  <img src="images/m-requests.svg" width="400" alt="talyx_requests_total: every request counted once, by method, server and status">
+  <img src="images/m-errors.svg" width="400" alt="talyx_errors_total: JSON-RPC errors and tool isError results, by error_code">
+</p>
+
+<p align="center">
+  <img src="images/m-duration.svg" width="400" alt="talyx_request_duration_seconds: a slow request lands in the tail and moves p95">
+</p>
+
 ## Multi Round-Trip 循環（招牌指標）
 
 一個 `2026-07-28` server 可以用 `InputRequiredResult`（`resultType: "input_required"`）
@@ -32,6 +41,21 @@ Talyx 在 `/metrics`（預設埠 `9464`）暴露 Prometheus 指標。它**不記
 
 `wait_type` 是 `input`（該腿帶 `inputRequests`——在等人/client）或 `poll`（只有 state
 ——server 要求 client 稍後重試）。
+
+<p align="center">
+  <img src="images/m-input-required.svg" width="400" alt="talyx_input_required_total: the server answers input_required and a cycle begins">
+  <img src="images/m-round-trips.svg" width="400" alt="talyx_round_trips_per_request: one request takes several round trips; more than 10 means a runaway loop">
+</p>
+
+<p align="center">
+  <img src="images/m-input-wait.svg" width="400" alt="cycle_duration minus input_wait: the human wait is cut out, leaving the server-side time to alert on">
+  <img src="images/m-abandoned.svg" width="400" alt="talyx_abandoned_cycles_total: the server asks for input and no follow-up ever arrives">
+</p>
+
+<p align="center">
+  <img src="images/m-state-rejected.svg" width="400" alt="talyx_request_state_rejected_total: the server rejects a requestState with reason invalid_request_state">
+  <img src="images/m-wait-type.svg" width="400" alt="wait_type: input waits on a human, poll retries with backoff">
+</p>
 
 ## 基礎 liveness 與自身指標
 

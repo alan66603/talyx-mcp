@@ -247,11 +247,18 @@ generic APM reads as two unrelated ones.
 | `talyx_abandoned_cycles_total` | counter | `server`, `wait_type` |
 | `talyx_request_state_rejected_total` | counter | `server` |
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/m-abandoned.svg" width="400" alt="talyx_abandoned_cycles_total: the server asks for input and no follow-up ever arrives">
+  <img src="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/m-input-wait.svg" width="400" alt="cycle_duration minus input_wait: the human wait is cut out, leaving the server-side time to alert on">
+</p>
+
+Diagrams for every metric: [docs/metrics.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.md).
+
 Plus basic liveness (`talyx_server_up`, `talyx_inflight_requests_lost_total`) and
 `talyx_proxy_overhead_seconds`.
 
 **`talyx_abandoned_cycles_total`** counts cycles where the server sent an
-`InputRequired` but got no follow-up. No error, no timeout, which can be overlooked. A single count means little (users pause or walk away), but a spike
+`InputRequired` but got no follow-up. No error reply comes back, so it is easy to overlook. A single count means little (users pause or walk away), but a spike
 above baseline usually signals a broken or confusing prompt, especially around
 high-risk `InputRequiredResult` gates.
 

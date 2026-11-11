@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160" width="400" height="160" role="img" aria-label="talyx_request_state_rejected_total: a retry carrying a requestState is rejected by the server with error.data.reason invalid_request_state">
+  <style>
+    svg { --fg: #1f2328; --mu: #59636e; --ln: #d0d7de; --card: #f6f8fa; --acc: #e6522c; --ok: #1a7f37; --bad: #cf222e; }
+    @media (prefers-color-scheme: dark) { svg { --fg: #e6edf3; --mu: #9198a1; --ln: #3d444d; --card: #151b23; --ok: #3fb950; --bad: #f85149; } }
+    text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; fill: var(--fg); }
+    .mu { fill: var(--mu); } .acc { fill: var(--acc); } .ok { fill: var(--ok); } .bad { fill: var(--bad); }
+    .frame { fill: var(--card); stroke: var(--ln); } .ln { stroke: var(--ln); } .node { fill: var(--card); stroke: var(--fg); }
+    .dot { fill: var(--fg); } .dbad { fill: var(--bad); } .sbad { stroke: var(--bad); }
+    .title { font-size: 12px; font-weight: 700; } .tag { font-size: 10px; fill: var(--mu); }
+
+    .req { animation: req 7400ms ease-in infinite; }
+    @keyframes req { 0% { transform: translateX(0); opacity: 0; } 3.03% { opacity: 1; } 24.97% { transform: translateX(226px); opacity: 1; } 25.73%, 100% { transform: translateX(226px); opacity: 0; } }
+    .wall { animation: wall 7400ms ease-out infinite; }
+    @keyframes wall { 0%, 24.22% { opacity: 0; } 25.73% { opacity: 1; } 28.76% { opacity: .4; } 31.78% { opacity: 1; } 45.41%, 100% { opacity: 0; } }
+    .back { animation: back 7400ms ease-out infinite; }
+    @keyframes back { 0%, 26.49% { transform: translateX(0); opacity: 0; } 28% { opacity: 1; } 46.92% { transform: translateX(-226px); opacity: 1; } 49.95%, 100% { transform: translateX(-226px); opacity: 0; } }
+    .stamp { transform-box: fill-box; transform-origin: center; animation: stamp 7400ms ease-out infinite; }
+    @keyframes stamp { 0%, 28.76% { opacity: 0; transform: scale(1.15); } 31.78%, 95.46% { opacity: 1; transform: scale(1); } 100% { opacity: 0; } }
+    .pop { animation: pop 7400ms ease-out infinite; }
+    @keyframes pop { 0%, 26.49% { opacity: 0; transform: translateY(4px); } 28.76%, 95.46% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-8px); } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .req, .back, .wall, .pop { opacity: 0; } }
+  </style>
+
+  <rect class="frame" x=".75" y=".75" width="398.5" height="158.5" rx="12" stroke-width="1.5"/>
+  <text class="title" x="16" y="26">talyx_request_state_rejected_total</text>
+  <text class="tag" x="384" y="26" text-anchor="end">counter</text>
+
+  <line class="ln" x1="52" y1="92" x2="296" y2="92" stroke-width="1.5"/>
+
+  <g class="req">
+    <circle class="dot" cx="62" cy="92" r="4.5"/>
+    <text class="mu" x="62" y="80" font-size="9" text-anchor="middle">requestState #9f2c</text>
+  </g>
+  <g class="back">
+    <circle class="dbad" cx="288" cy="92" r="4.5"/>
+    <text class="bad" x="288" y="80" font-size="9" text-anchor="middle">-32602</text>
+  </g>
+
+  <circle class="node" cx="40" cy="92" r="12" stroke-width="2"/>
+  <rect class="node" x="300" y="70" width="84" height="44" rx="8" stroke-width="1.5"/>
+  <text x="342" y="96" font-size="11" text-anchor="middle">server</text>
+  <line class="wall sbad" x1="296" y1="64" x2="296" y2="120" stroke-width="3" stroke-linecap="round"/>
+  <text class="pop bad" x="342" y="62" font-size="13" font-weight="700" text-anchor="middle">+1</text>
+
+  <text class="stamp bad" x="200" y="134" font-size="10" font-weight="700" text-anchor="middle">error.data.reason = "invalid_request_state"</text>
+  <text class="mu" x="16" y="150" font-size="10">match data.reason, not the code (-32602 is generic)</text>
+</svg>

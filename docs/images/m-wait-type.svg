@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160" width="400" height="160" role="img" aria-label="wait_type label: input means one long wait for a human; poll means the client retries with growing backoff">
+  <style>
+    svg { --fg: #1f2328; --mu: #59636e; --ln: #d0d7de; --card: #f6f8fa; --acc: #e6522c; --ok: #1a7f37; --bad: #cf222e; }
+    @media (prefers-color-scheme: dark) { svg { --fg: #e6edf3; --mu: #9198a1; --ln: #3d444d; --card: #151b23; --ok: #3fb950; --bad: #f85149; } }
+    text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; fill: var(--fg); }
+    .mu { fill: var(--mu); } .acc { fill: var(--acc); } .ok { fill: var(--ok); } .bad { fill: var(--bad); }
+    .frame { fill: var(--card); stroke: var(--ln); } .ln { stroke: var(--ln); }
+    .dot { fill: var(--fg); } .dacc { fill: var(--acc); } .dok { fill: var(--ok); } .sacc { stroke: var(--acc); }
+    .title { font-size: 12px; font-weight: 700; } .tag { font-size: 10px; fill: var(--mu); }
+
+    /* shared clock: x = 80 + 260·(t / 70%) */
+    .head { animation: head 8200ms linear infinite; }
+    @keyframes head { 0% { transform: translateX(0); opacity: .45; } 54.63% { transform: translateX(260px); opacity: .45; } 56.2%, 100% { transform: translateX(260px); opacity: 0; } }
+    .bar { transform-box: fill-box; transform-origin: left center; animation: bar 8200ms linear infinite; }
+    @keyframes bar { 0% { transform: scaleX(0); opacity: 1; } 54.63%, 95.32% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+    .t1 { animation: t1 8200ms linear infinite; } @keyframes t1 { 0%, 1.17%  { opacity: 0; } 1.56%, 95.32%  { opacity: 1; } 100% { opacity: 0; } }
+    .t2 { animation: t2 8200ms linear infinite; } @keyframes t2 { 0%, 3.28%  { opacity: 0; } 3.67%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+    .t3 { animation: t3 8200ms linear infinite; } @keyframes t3 { 0%, 6.63%  { opacity: 0; } 7.02%, 95.32%  { opacity: 1; } 100% { opacity: 0; } }
+    .t4 { animation: t4 8200ms linear infinite; } @keyframes t4 { 0%, 11.71%   { opacity: 0; } 12.1%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+    .t5 { animation: t5 8200ms linear infinite; } @keyframes t5 { 0%, 19.28% { opacity: 0; } 19.67%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+    .t6 { animation: t6 8200ms linear infinite; } @keyframes t6 { 0%, 28.49% { opacity: 0; } 28.88%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+    .t7 { animation: t7 8200ms linear infinite; } @keyframes t7 { 0%, 39.41% { opacity: 0; } 39.8%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+    .t8 { animation: t8 8200ms linear infinite; } @keyframes t8 { 0%, 54.24% { opacity: 0; } 54.63%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+    .blink { animation: blink 1000ms steps(1) infinite; } @keyframes blink { 50% { opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .head { opacity: 0; } }
+  </style>
+
+  <rect class="frame" x=".75" y=".75" width="398.5" height="158.5" rx="12" stroke-width="1.5"/>
+  <text class="title" x="16" y="26">wait_type</text>
+  <text class="tag" x="384" y="26" text-anchor="end">label · input vs poll</text>
+
+  <!-- input: one long wait for a human -->
+  <text class="acc" x="16" y="62" font-size="11">input</text>
+  <rect class="bar dacc" x="80" y="52" width="260" height="12" rx="6" fill-opacity=".3"/>
+  <text class="mu" x="88" y="61" font-size="9">waiting for a human<tspan class="blink">_</tspan></text>
+  <rect class="t8 dok" x="338" y="47" width="4" height="22" rx="2"/>
+
+  <!-- poll: server says "later", client backs off -->
+  <text x="16" y="108" font-size="11">poll</text>
+  <line class="ln" x1="80" y1="104" x2="340" y2="104" stroke-width="1.5"/>
+  <g class="dot">
+    <rect class="t1" x="84.5"  y="97" width="3" height="14" rx="1.5"/>
+    <rect class="t2" x="94.5"  y="97" width="3" height="14" rx="1.5"/>
+    <rect class="t3" x="110.5" y="97" width="3" height="14" rx="1.5"/>
+    <rect class="t4" x="134.5" y="97" width="3" height="14" rx="1.5"/>
+    <rect class="t5" x="170.5" y="97" width="3" height="14" rx="1.5"/>
+    <rect class="t6" x="214.5" y="97" width="3" height="14" rx="1.5"/>
+    <rect class="t7" x="266.5" y="97" width="3" height="14" rx="1.5"/>
+  </g>
+  <rect class="t8 dok" x="338" y="93" width="4" height="22" rx="2"/>
+  <text class="mu" x="80" y="128" font-size="9">retry later · client backs off 50→250ms</text>
+
+  <line class="head sacc" x1="80" y1="42" x2="80" y2="118" stroke-width="1.5"/>
+
+  <text class="mu" x="16" y="148" font-size="10">same cycle shape, different meaning — never mix</text>
+</svg>

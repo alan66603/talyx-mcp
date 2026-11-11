@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160" width="400" height="160" role="img" aria-label="talyx_request_duration_seconds: a fast request lands in a low bucket, a slow one lands in the tail and pulls p95 to the right while p50 barely moves">
+  <style>
+    svg { --fg: #1f2328; --mu: #59636e; --ln: #d0d7de; --card: #f6f8fa; --acc: #e6522c; --ok: #1a7f37; --bad: #cf222e; }
+    @media (prefers-color-scheme: dark) { svg { --fg: #e6edf3; --mu: #9198a1; --ln: #3d444d; --card: #151b23; --ok: #3fb950; --bad: #f85149; } }
+    text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; fill: var(--fg); }
+    .mu { fill: var(--mu); } .acc { fill: var(--acc); } .ok { fill: var(--ok); } .bad { fill: var(--bad); }
+    .frame { fill: var(--card); stroke: var(--ln); } .ln { stroke: var(--ln); } .node { fill: var(--card); stroke: var(--fg); }
+    .dot { fill: var(--fg); } .dacc { fill: var(--acc); } .sacc { stroke: var(--acc); } .smu { stroke: var(--mu); }
+    .bar { fill: var(--mu); opacity: .4; }
+    .title { font-size: 12px; font-weight: 700; } .tag { font-size: 10px; fill: var(--mu); }
+
+    /* fast request: 2% → 18% */
+    .fo { animation: fo 8200ms ease-in-out infinite; } @keyframes fo { 0%, 1.56% { transform: translateX(0); opacity: 1; } 7.8% { transform: translateX(104px); opacity: 1; } 8.2%, 100% { transform: translateX(104px); opacity: 0; } }
+    .fb { animation: fb 8200ms ease-in-out infinite; } @keyframes fb { 0%, 7.8% { transform: translateX(0); opacity: 0; } 8.2% { opacity: 1; } 14.05% { transform: translateX(-104px); opacity: 1; } 14.83%, 100% { transform: translateX(-104px); opacity: 0; } }
+    /* slow request: out 28→36, stuck at server 36→60, back 60→68 */
+    .so { animation: so 8200ms ease-in-out infinite; } @keyframes so { 0%, 21.85% { transform: translateX(0); opacity: 0; } 22.24% { opacity: 1; } 28.1% { transform: translateX(104px); opacity: 1; } 28.49%, 100% { transform: translateX(104px); opacity: 0; } }
+    .sb { animation: sb 8200ms ease-in-out infinite; } @keyframes sb { 0%, 46.83% { transform: translateX(0); opacity: 0; } 47.22% { opacity: 1; } 53.07% { transform: translateX(-104px); opacity: 1; } 53.85%, 100% { transform: translateX(-104px); opacity: 0; } }
+    .busy { animation: busy 8200ms ease-in-out infinite; } @keyframes busy { 0%, 28.1% { opacity: 0; } 31.22% { opacity: 1; } 34.34% { opacity: .3; } 37.46% { opacity: 1; } 40.59% { opacity: .3; } 43.71% { opacity: 1; } 46.83%, 100% { opacity: 0; } }
+
+    /* stopwatch bars */
+    .t { transform-box: fill-box; transform-origin: left center; }
+    .tf { animation: tf 8200ms linear infinite; } @keyframes tf { 0%, 1.56% { transform: scaleX(0); opacity: 1; } 14.05%, 18.73% { transform: scaleX(1); opacity: 1; } 21.07%, 100% { transform: scaleX(1); opacity: 0; } }
+    .ts { animation: ts 8200ms linear infinite; } @keyframes ts { 0%, 21.85% { transform: scaleX(0); opacity: 1; } 53.07%, 95.32% { transform: scaleX(1); opacity: 1; } 100% { transform: scaleX(1); opacity: 0; } }
+    .lf { animation: lf 8200ms linear infinite; } @keyframes lf { 0%, 14.05% { opacity: 0; } 14.83%, 18.73% { opacity: 1; } 21.07%, 100% { opacity: 0; } }
+    .ls { animation: ls 8200ms linear infinite; } @keyframes ls { 0%, 53.07% { opacity: 0; } 53.85%, 95.32% { opacity: 1; } 100% { opacity: 0; } }
+
+    /* histogram increments + p99 slide */
+    .inc { transform-box: fill-box; transform-origin: center bottom; }
+    .i2 { animation: i2 8200ms ease-out infinite; } @keyframes i2 { 0%, 14.83% { transform: scaleY(0); opacity: 1; } 18.73%, 95.32% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+    .i4 { animation: i4 8200ms ease-out infinite; } @keyframes i4 { 0%, 53.85% { transform: scaleY(0); opacity: 1; } 57.76%, 95.32% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+    .p99 { animation: p99 8200ms ease-in-out infinite; } @keyframes p99 { 0%, 57.76% { transform: translateX(0); } 64%, 95.32% { transform: translateX(28px); } 100% { transform: translateX(0); } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .fo, .fb, .so, .sb, .busy, .tf, .lf { opacity: 0; } .p99 { transform: translateX(28px); } }
+  </style>
+
+  <rect class="frame" x=".75" y=".75" width="398.5" height="158.5" rx="12" stroke-width="1.5"/>
+  <text class="title" x="16" y="26">talyx_request_duration_seconds</text>
+  <text class="tag" x="384" y="26" text-anchor="end">histogram</text>
+
+  <!-- lane -->
+  <line class="ln" x1="52" y1="70" x2="164" y2="70" stroke-width="1.5"/>
+  <circle class="fo dot" cx="56" cy="70" r="4.5"/> <circle class="fb dot" cx="160" cy="70" r="4.5"/>
+  <circle class="so dot" cx="56" cy="70" r="4.5"/> <circle class="sb dot" cx="160" cy="70" r="4.5"/>
+  <circle class="node" cx="40" cy="70" r="12" stroke-width="2"/>
+  <rect class="node" x="164" y="52" width="52" height="36" rx="8" stroke-width="1.5"/>
+  <rect class="busy sacc" x="164" y="52" width="52" height="36" rx="8" fill="none" stroke-width="2.5"/>
+  <text x="190" y="74" font-size="10" text-anchor="middle">server</text>
+
+  <!-- stopwatch -->
+  <rect class="t tf dot" x="28" y="102" width="22" height="8" rx="4" opacity=".7"/>
+  <text class="lf" x="56" y="110" font-size="10">38ms</text>
+  <rect class="t ts dacc" x="28" y="102" width="150" height="8" rx="4"/>
+  <text class="ls acc" x="184" y="110" font-size="10" font-weight="700">1.4s</text>
+
+  <!-- histogram -->
+  <line class="ln" x1="240" y1="118" x2="384" y2="118" stroke-width="1.5"/>
+  <rect class="bar" x="244" y="86"  width="20" height="32" rx="2"/>
+  <rect class="bar" x="272" y="70"  width="20" height="48" rx="2"/>
+  <rect class="inc i2" x="272" y="62" width="20" height="8" rx="2" style="fill: var(--fg)"/>
+  <rect class="bar" x="300" y="98" width="20" height="20" rx="2"/>
+  <rect class="bar" x="328" y="112" width="20" height="6"  rx="2"/>
+  <rect class="inc i4 dacc" x="328" y="104" width="20" height="8" rx="2"/>
+  <rect class="bar" x="356" y="116" width="20" height="2"  rx="1"/>
+  <g class="mu" font-size="8" text-anchor="middle">
+    <text x="254" y="130">10ms</text><text x="282" y="130">50ms</text><text x="310" y="130">250ms</text>
+    <text x="338" y="130">1s</text><text x="366" y="130">5s</text>
+  </g>
+
+  <!-- quantile markers -->
+  <line class="smu" x1="286" y1="50" x2="286" y2="118" stroke-width="1.5" stroke-dasharray="3 3"/>
+  <text class="mu" x="286" y="46" font-size="10" text-anchor="middle">p50</text>
+  <g class="p99">
+    <line class="sacc" x1="310" y1="50" x2="310" y2="118" stroke-width="1.5" stroke-dasharray="3 3"/>
+    <text class="acc" x="310" y="46" font-size="10" font-weight="700" text-anchor="middle">p95</text>
+  </g>
+
+  <text class="mu" x="16" y="148" font-size="10">p50 barely moves · p95 catches the slow one</text>
+</svg>

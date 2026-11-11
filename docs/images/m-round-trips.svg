@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 160" width="400" height="160" role="img" aria-label="talyx_round_trips_per_request: one request bounces client to server three times before completing; the histogram's 3-round bucket grows by one">
+  <style>
+    svg { --fg: #1f2328; --mu: #59636e; --ln: #d0d7de; --card: #f6f8fa; --acc: #e6522c; --ok: #1a7f37; --bad: #cf222e; }
+    @media (prefers-color-scheme: dark) { svg { --fg: #e6edf3; --mu: #9198a1; --ln: #3d444d; --card: #151b23; --ok: #3fb950; --bad: #f85149; } }
+    text { font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace; fill: var(--fg); }
+    .mu { fill: var(--mu); } .acc { fill: var(--acc); } .ok { fill: var(--ok); } .bad { fill: var(--bad); }
+    .frame { fill: var(--card); stroke: var(--ln); } .ln { stroke: var(--ln); } .node { fill: var(--card); stroke: var(--fg); }
+    .bar { fill: var(--mu); opacity: .4; } .dacc { fill: var(--acc); } .dbad { fill: var(--bad); }
+    .title { font-size: 12px; font-weight: 700; } .tag { font-size: 10px; fill: var(--mu); }
+
+    /* out = call (fg), back = input_required (acc) ×2, last back = complete (ok) */
+    .pk { animation: pk 9000ms linear infinite; }
+    @keyframes pk {
+      0%    { transform: translateX(0);     fill: var(--fg);  opacity: 1; }
+      7.92%  { transform: translateX(116px); fill: var(--fg); }
+      8%   { transform: translateX(116px); fill: var(--acc); }
+      15.92% { transform: translateX(0);     fill: var(--acc); }
+      16%   { transform: translateX(0);     fill: var(--fg); }
+      23.92% { transform: translateX(116px); fill: var(--fg); }
+      24%   { transform: translateX(116px); fill: var(--acc); }
+      31.92% { transform: translateX(0);     fill: var(--acc); }
+      32%   { transform: translateX(0);     fill: var(--fg); }
+      39.92% { transform: translateX(116px); fill: var(--fg); }
+      40%   { transform: translateX(116px); fill: var(--ok); }
+      48%   { transform: translateX(0);     fill: var(--ok);  opacity: 1; }
+      49.6%, 100% { transform: translateX(0); fill: var(--ok); opacity: 0; }
+    }
+    .r1 { animation: r1 9000ms linear infinite; } @keyframes r1 { 0%, 15.2% { opacity: 1; } 16%, 100% { opacity: 0; } }
+    .r2 { animation: r2 9000ms linear infinite; } @keyframes r2 { 0%, 15.2% { opacity: 0; } 16%, 31.2% { opacity: 1; } 32%, 100% { opacity: 0; } }
+    .r3 { animation: r3 9000ms linear infinite; } @keyframes r3 { 0%, 31.2% { opacity: 0; } 32%, 47.2% { opacity: 1; } 48%, 100% { opacity: 0; } }
+    .rd { animation: rd 9000ms linear infinite; } @keyframes rd { 0%, 47.2% { opacity: 0; } 48.8%, 95.2% { opacity: 1; } 100% { opacity: 0; } }
+    .inc { transform-box: fill-box; transform-origin: center bottom; animation: inc 9000ms ease-out infinite; }
+    @keyframes inc { 0%, 48.8% { transform: scaleY(0); opacity: 1; } 53.6%, 95.2% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } .r1, .r2, .r3, .pk { opacity: 0; } }
+  </style>
+
+  <rect class="frame" x=".75" y=".75" width="398.5" height="158.5" rx="12" stroke-width="1.5"/>
+  <text class="title" x="16" y="26">talyx_round_trips_per_request</text>
+  <text class="tag" x="384" y="26" text-anchor="end">histogram</text>
+
+  <!-- one logical request bouncing -->
+  <line class="ln" x1="52" y1="88" x2="164" y2="88" stroke-width="1.5"/>
+  <circle class="pk" cx="52" cy="88" r="4.5"/>
+  <circle class="node" cx="40" cy="88" r="12" stroke-width="2"/>
+  <rect class="node" x="164" y="70" width="52" height="36" rx="8" stroke-width="1.5"/>
+  <text x="190" y="92" font-size="10" text-anchor="middle">server</text>
+  <text class="mu" x="40" y="118" font-size="10" text-anchor="middle">client</text>
+  <text class="r1 acc" x="112" y="118" font-size="11" text-anchor="middle">round 1</text>
+  <text class="r2 acc" x="112" y="118" font-size="11" text-anchor="middle">round 2</text>
+  <text class="r3 acc" x="112" y="118" font-size="11" text-anchor="middle">round 3</text>
+  <text class="rd ok" x="112" y="118" font-size="11" text-anchor="middle">complete ✓</text>
+
+  <!-- histogram -->
+  <line class="ln" x1="240" y1="128" x2="384" y2="128" stroke-width="1.5"/>
+  <rect class="bar" x="244" y="84"  width="20" height="44" rx="2"/>
+  <rect class="bar" x="272" y="98"  width="20" height="30" rx="2"/>
+  <rect class="bar" x="300" y="112" width="20" height="16" rx="2"/>
+  <rect class="inc dacc" x="300" y="100" width="20" height="12" rx="2"/>
+  <rect class="bar" x="328" y="121" width="20" height="7"  rx="2"/>
+  <rect class="dbad" x="356" y="125" width="20" height="3" rx="1" opacity=".8"/>
+  <g class="mu" font-size="10" text-anchor="middle">
+    <text x="254" y="142">1</text><text x="282" y="142">2</text><text class="acc" x="310" y="142">3</text>
+    <text x="338" y="142">5</text><text class="bad" x="366" y="142">&gt;10</text>
+  </g>
+
+  <text class="mu" x="16" y="148" font-size="10">&gt;10 rounds = runaway loop → alert</text>
+</svg>

@@ -222,11 +222,18 @@ server 才自行崩潰，仍會被視為正常結束。
 | `talyx_abandoned_cycles_total` | counter | `server`、`wait_type` |
 | `talyx_request_state_rejected_total` | counter | `server` |
 
+<p align="center">
+  <img src="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/m-abandoned.svg" width="400" alt="talyx_abandoned_cycles_total: the server asks for input and no follow-up ever arrives">
+  <img src="https://raw.githubusercontent.com/alan66603/talyx-mcp/main/docs/images/m-input-wait.svg" width="400" alt="cycle_duration minus input_wait: the human wait is cut out, leaving the server-side time to alert on">
+</p>
+
+每個指標的示意圖見 [docs/metrics.zh-TW.md](https://github.com/alan66603/talyx-mcp/blob/main/docs/metrics.zh-TW.md)。
+
 另有基礎 liveness（`talyx_server_up`、`talyx_inflight_requests_lost_total`）與
 `talyx_proxy_overhead_seconds`。
 
 **`talyx_abandoned_cycles_total`** 記錄 server 發出 `InputRequired` 卻沒等到
-回覆的循環。這在新版本不算 error 也沒有 timeout, 因此是容易被忽略的行爲。單次計數並無代表性(使用者可能
+回覆的循環。這不會產生任何 error 回覆，因此容易被忽略。單次計數並無代表性(使用者可能
 只是離開)，但比率異常升高可能表示提示壞了或令人困惑，在高風險的
 `InputRequiredResult` 把關處值得參考。
 
